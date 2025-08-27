@@ -6,6 +6,7 @@ from markdown.extensions import codehilite, fenced_code, tables, toc
 from streamlit_ace import st_ace
 import base64
 import tempfile
+import time
 from ai_service import ai_service
 
 def find_markdown_files(directory):
@@ -114,6 +115,51 @@ def save_file_directly(file_path, content):
         return True, "File saved successfully!"
     except Exception as e:
         return False, f"Error saving file: {str(e)}"
+
+def get_ai_summary_folder():
+    """Get or create the AISummary folder in the current project directory"""
+    if 'last_folder_path' not in st.session_state:
+        return None, "No folder selected"
+    
+    base_folder = st.session_state.last_folder_path
+    if not base_folder or not os.path.exists(base_folder):
+        return None, "Invalid project folder path"
+    
+    summary_folder = os.path.join(base_folder, "AISummary")
+    
+    try:
+        # Create the folder if it doesn't exist
+        if not os.path.exists(summary_folder):
+            os.makedirs(summary_folder)
+        return summary_folder, "AISummary folder ready"
+    except Exception as e:
+        return None, f"Error creating AISummary folder: {str(e)}"
+
+def save_ai_summary_to_project(summary_content, base_filename, template_name):
+    """Save AI summary to the project's AISummary folder"""
+    summary_folder, message = get_ai_summary_folder()
+    if not summary_folder:
+        return False, message
+    
+    # Create a descriptive filename
+    safe_template = template_name.replace(" ", "_").lower()
+    safe_filename = base_filename.replace(".md", "").replace(".markdown", "")
+    summary_filename = f"{safe_filename}_{safe_template}_summary.md"
+    full_path = os.path.join(summary_folder, summary_filename)
+    
+    try:
+        with open(full_path, 'w', encoding='utf-8') as file:
+            # Add metadata header to the summary
+            file.write(f"# AI Summary: {base_filename}\n\n")
+            file.write(f"**Template**: {template_name}  \n")
+            file.write(f"**Generated**: {time.strftime('%Y-%m-%d %H:%M:%S')}  \n")
+            file.write(f"**Source**: {base_filename}  \n\n")
+            file.write("---\n\n")
+            file.write(summary_content)
+        
+        return True, f"Summary saved to: AISummary/{summary_filename}"
+    except Exception as e:
+        return False, f"Error saving summary: {str(e)}"
 
 def check_unsaved_changes():
     """Check if there are unsaved changes"""
@@ -689,17 +735,17 @@ def main():
                             st.success("Summary copied to view! Use Ctrl+A, Ctrl+C to copy.")
                     
                     with col2:
-                        # Download button
-                        if st.button("📥 Download Summary", use_container_width=True, key="sidebar_download"):
-                            filename = f"{st.session_state.get('file_name', 'document')}_summary.md"
-                            st.download_button(
-                                label="📥 Download as Markdown",
-                                data=st.session_state.ai_summary,
-                                file_name=filename,
-                                mime="text/markdown",
-                                use_container_width=True,
-                                key="sidebar_download_btn"
+                        # Save to project button
+                        if st.button("💾 Save to Project", use_container_width=True, key="sidebar_save"):
+                            success, message = save_ai_summary_to_project(
+                                st.session_state.ai_summary,
+                                st.session_state.get('file_name', 'document'),
+                                st.session_state.ai_last_template_used
                             )
+                            if success:
+                                st.success(message)
+                            else:
+                                st.error(message)
                 
                 # Show info for other layouts
                 elif (st.session_state.ai_summary and 
@@ -709,16 +755,17 @@ def main():
                     if st.session_state.ai_last_template_used:
                         st.caption(f"Generated using: {st.session_state.ai_last_template_used}")
                     
-                    # Just show download button in sidebar for convenience
-                    filename = f"{st.session_state.get('file_name', 'document')}_summary.md"
-                    st.download_button(
-                        label="📥 Download Summary",
-                        data=st.session_state.ai_summary,
-                        file_name=filename,
-                        mime="text/markdown",
-                        use_container_width=True,
-                        key="sidebar_download_btn_alt"
-                    )
+                    # Save to project button for convenience
+                    if st.button("💾 Save to Project", use_container_width=True, key="sidebar_save_alt"):
+                        success, message = save_ai_summary_to_project(
+                            st.session_state.ai_summary,
+                            st.session_state.get('file_name', 'document'),
+                            st.session_state.ai_last_template_used
+                        )
+                        if success:
+                            st.success(message)
+                        else:
+                            st.error(message)
     
     # Main content area
     if 'selected_file' in st.session_state and os.path.exists(st.session_state.selected_file):
@@ -866,15 +913,16 @@ def main():
                                     st.success("Summary ready to copy!")
                             
                             with col_download:
-                                filename = f"{st.session_state.get('file_name', 'document')}_summary.md"
-                                st.download_button(
-                                    label="📥 Download",
-                                    data=st.session_state.ai_summary,
-                                    file_name=filename,
-                                    mime="text/markdown",
-                                    use_container_width=True,
-                                    key="main_download_btn"
-                                )
+                                if st.button("💾 Save to Project", use_container_width=True, key="main_save"):
+                                    success, message = save_ai_summary_to_project(
+                                        st.session_state.ai_summary,
+                                        st.session_state.get('file_name', 'document'),
+                                        st.session_state.ai_last_template_used
+                                    )
+                                    if success:
+                                        st.success(message)
+                                    else:
+                                        st.error(message)
                     
                     elif has_summary and st.session_state.ai_summary_layout == "tabbed":
                         # Tabbed layout: tabs for markdown and summary
@@ -899,15 +947,16 @@ def main():
                                     st.success("Summary ready to copy!")
                             
                             with col_download:
-                                filename = f"{st.session_state.get('file_name', 'document')}_summary.md"
-                                st.download_button(
-                                    label="📥 Download Summary",
-                                    data=st.session_state.ai_summary,
-                                    file_name=filename,
-                                    mime="text/markdown",
-                                    use_container_width=True,
-                                    key="tab_download_btn"
-                                )
+                                if st.button("💾 Save to Project", use_container_width=True, key="tab_save"):
+                                    success, message = save_ai_summary_to_project(
+                                        st.session_state.ai_summary,
+                                        st.session_state.get('file_name', 'document'),
+                                        st.session_state.ai_last_template_used
+                                    )
+                                    if success:
+                                        st.success(message)
+                                    else:
+                                        st.error(message)
                     
                     else:
                         # Default layout (sidebar or no summary)
