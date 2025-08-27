@@ -39,6 +39,7 @@ The app implements a complex internal link navigation system using:
 - JavaScript event handling in HTML components
 - Multiple fallback communication methods between iframe and parent
 - Session state updates for seamless file transitions
+- Brand it like fyisoft.com
 
 ### Styling
 Custom CSS provides GitHub-style formatting with syntax highlighting classes for code blocks, proper table styling, and responsive design elements.
