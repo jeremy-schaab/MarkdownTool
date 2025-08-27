@@ -76,16 +76,29 @@ def initialize_session_state():
         st.session_state.editor_layout = "inline"  # inline, side-by-side, tabbed
     if 'original_content' not in st.session_state:
         st.session_state.original_content = ""
+    if 'confirm_save' not in st.session_state:
+        st.session_state.confirm_save = False
 
 def toggle_edit_mode():
     """Toggle between view and edit modes"""
     st.session_state.edit_mode = not st.session_state.edit_mode
+    # Reset confirmation state when toggling modes
+    st.session_state.confirm_save = False
     
 def save_file_content(content, filename):
     """Create a download link for the modified content"""
     b64 = base64.b64encode(content.encode()).decode()
     href = f'data:text/markdown;base64,{b64}'
     return href
+
+def save_file_directly(file_path, content):
+    """Save content directly to the file"""
+    try:
+        with open(file_path, 'w', encoding='utf-8') as file:
+            file.write(content)
+        return True, "File saved successfully!"
+    except Exception as e:
+        return False, f"Error saving file: {str(e)}"
 
 def check_unsaved_changes():
     """Check if there are unsaved changes"""
@@ -254,18 +267,55 @@ def main():
                 else:
                     st.success("✅ No unsaved changes")
                 
-                # Save button
-                if st.button("💾 Download File", use_container_width=True, disabled=not check_unsaved_changes()):
-                    if st.session_state.editor_content:
-                        filename = st.session_state.get('file_name', 'edited_file.md')
-                        st.download_button(
-                            label="📥 Download Modified File",
-                            data=st.session_state.editor_content,
-                            file_name=filename,
-                            mime="text/markdown",
-                            use_container_width=True
-                        )
-                        st.success("File ready for download!")
+                # Save buttons
+                if check_unsaved_changes():
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        # Save directly to file (only for non-temporary files)
+                        file_path = st.session_state.get('selected_file', '')
+                        is_temp_file = file_path.endswith('.tmp') or 'temp' in file_path.lower()
+                        
+                        if not st.session_state.confirm_save:
+                            if st.button("💾 Save File", use_container_width=True, disabled=is_temp_file, 
+                                       help="Save changes directly to the original file" if not is_temp_file else "Cannot save temporary uploaded files directly"):
+                                if not is_temp_file:
+                                    st.session_state.confirm_save = True
+                                    st.rerun()
+                        else:
+                            st.warning("⚠️ This will overwrite the original file. Are you sure?")
+                            col_yes, col_no = st.columns(2)
+                            with col_yes:
+                                if st.button("✅ Yes, Save", use_container_width=True):
+                                    success, message = save_file_directly(file_path, st.session_state.editor_content)
+                                    if success:
+                                        st.success(message)
+                                        # Update original content to reflect saved state
+                                        st.session_state.original_content = st.session_state.editor_content
+                                        st.session_state.confirm_save = False
+                                        st.rerun()
+                                    else:
+                                        st.error(message)
+                                        st.session_state.confirm_save = False
+                            with col_no:
+                                if st.button("❌ Cancel", use_container_width=True):
+                                    st.session_state.confirm_save = False
+                                    st.rerun()
+                    
+                    with col2:
+                        # Download option (always available)
+                        if st.button("📥 Download", use_container_width=True, help="Download modified file"):
+                            if st.session_state.editor_content:
+                                filename = st.session_state.get('file_name', 'edited_file.md')
+                                st.download_button(
+                                    label="📥 Download Modified File",
+                                    data=st.session_state.editor_content,
+                                    file_name=filename,
+                                    mime="text/markdown",
+                                    use_container_width=True
+                                )
+                else:
+                    st.info("💾 No changes to save")
     
     # Main content area
     if 'selected_file' in st.session_state and os.path.exists(st.session_state.selected_file):
@@ -643,6 +693,7 @@ def main():
                                 st.session_state.editor_content = ""
                                 st.session_state.original_content = ""
                                 st.session_state.has_unsaved_changes = False
+                                st.session_state.confirm_save = False
                                 
                                 # Update the folder path to the new file's directory if needed
                                 new_dir = os.path.dirname(target_path)
