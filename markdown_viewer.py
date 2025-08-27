@@ -3,6 +3,9 @@ import os
 from pathlib import Path
 import markdown
 from markdown.extensions import codehilite, fenced_code, tables, toc
+from streamlit_ace import st_ace
+import base64
+import tempfile
 
 def find_markdown_files(directory):
     """Recursively find all markdown files in a directory"""
@@ -61,6 +64,61 @@ def resolve_markdown_link(current_file_path, link_href):
     
     return None
 
+def initialize_session_state():
+    """Initialize session state variables for editor functionality"""
+    if 'edit_mode' not in st.session_state:
+        st.session_state.edit_mode = False
+    if 'editor_content' not in st.session_state:
+        st.session_state.editor_content = ""
+    if 'has_unsaved_changes' not in st.session_state:
+        st.session_state.has_unsaved_changes = False
+    if 'editor_layout' not in st.session_state:
+        st.session_state.editor_layout = "inline"  # inline, side-by-side, tabbed
+    if 'original_content' not in st.session_state:
+        st.session_state.original_content = ""
+
+def toggle_edit_mode():
+    """Toggle between view and edit modes"""
+    st.session_state.edit_mode = not st.session_state.edit_mode
+    
+def save_file_content(content, filename):
+    """Create a download link for the modified content"""
+    b64 = base64.b64encode(content.encode()).decode()
+    href = f'data:text/markdown;base64,{b64}'
+    return href
+
+def check_unsaved_changes():
+    """Check if there are unsaved changes"""
+    if hasattr(st.session_state, 'editor_content') and hasattr(st.session_state, 'original_content'):
+        return st.session_state.editor_content != st.session_state.original_content
+    return False
+
+def render_editor_toolbar():
+    """Render the editor toolbar with formatting buttons"""
+    col1, col2, col3, col4, col5, col6, col7 = st.columns([1, 1, 1, 1, 1, 1, 2])
+    
+    with col1:
+        if st.button("**B**", help="Bold text", key="bold_btn"):
+            st.session_state.editor_insert = "**bold text**"
+    with col2:
+        if st.button("*I*", help="Italic text", key="italic_btn"):
+            st.session_state.editor_insert = "*italic text*"
+    with col3:
+        if st.button("H1", help="Header 1", key="h1_btn"):
+            st.session_state.editor_insert = "# Header 1"
+    with col4:
+        if st.button("H2", help="Header 2", key="h2_btn"):
+            st.session_state.editor_insert = "## Header 2"
+    with col5:
+        if st.button("[](", help="Link", key="link_btn"):
+            st.session_state.editor_insert = "[link text](url)"
+    with col6:
+        if st.button("`", help="Code", key="code_btn"):
+            st.session_state.editor_insert = "`code`"
+    with col7:
+        if st.button("📋 Copy", help="Copy content to clipboard", key="copy_btn"):
+            st.code(st.session_state.editor_content)
+
 def main():
     st.set_page_config(
         page_title="Markdown Viewer",
@@ -68,6 +126,9 @@ def main():
         layout="wide",
         initial_sidebar_state="expanded"
     )
+    
+    # Initialize session state
+    initialize_session_state()
     
     # Check for navigation via URL parameters
     query_params = st.query_params
@@ -87,7 +148,6 @@ def main():
     # Sidebar with file selection
     with st.sidebar:
         st.header("📁 Select Markdown File")
-        
         # File uploader for markdown files
         uploaded_file = st.file_uploader(
             "Choose a markdown file",
@@ -108,12 +168,9 @@ def main():
         st.divider()
         
         # Alternative: Browse local files (folder path input)
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            st.subheader("Or browse local folder")
-        with col2:
-            if st.button("🔄 Refresh", help="Refresh file list", use_container_width=True):
-                st.rerun()
+        st.subheader("Or browse local folder")
+        if st.button("🔄 Refresh", help="Refresh file list", use_container_width=True):
+            st.rerun()
         
         # Initialize folder path in session state if not exists
         if 'last_folder_path' not in st.session_state:
@@ -168,6 +225,47 @@ def main():
                 st.info("No markdown files found in this folder")
         elif folder_path:
             st.error("Invalid folder path")
+        
+        # Editor controls in sidebar (always show for demonstration)
+        if True:  # Temporarily always show editor controls
+            st.divider()
+            st.subheader("✏️ Editor Controls")
+            
+            # Edit mode toggle
+            edit_btn_text = "📝 Exit Edit Mode" if st.session_state.edit_mode else "✏️ Edit File"
+            if st.button(edit_btn_text, use_container_width=True, type="primary" if st.session_state.edit_mode else "secondary"):
+                if st.session_state.edit_mode and check_unsaved_changes():
+                    st.warning("⚠️ You have unsaved changes! Please save or they will be lost.")
+                toggle_edit_mode()
+                st.rerun()
+            
+            # Layout options (only show in edit mode)
+            if st.session_state.edit_mode:
+                st.session_state.editor_layout = st.radio(
+                    "Layout:",
+                    ["inline", "side-by-side", "tabbed"],
+                    index=["inline", "side-by-side", "tabbed"].index(st.session_state.editor_layout),
+                    help="Choose how to display editor and preview"
+                )
+                
+                # Unsaved changes indicator
+                if check_unsaved_changes():
+                    st.warning("⚠️ Unsaved changes")
+                else:
+                    st.success("✅ No unsaved changes")
+                
+                # Save button
+                if st.button("💾 Download File", use_container_width=True, disabled=not check_unsaved_changes()):
+                    if st.session_state.editor_content:
+                        filename = st.session_state.get('file_name', 'edited_file.md')
+                        st.download_button(
+                            label="📥 Download Modified File",
+                            data=st.session_state.editor_content,
+                            file_name=filename,
+                            mime="text/markdown",
+                            use_container_width=True
+                        )
+                        st.success("File ready for download!")
     
     # Main content area
     if 'selected_file' in st.session_state and os.path.exists(st.session_state.selected_file):
@@ -188,18 +286,110 @@ def main():
             with open(selected_file_path, 'r', encoding='utf-8') as file:
                 content = file.read()
             
+            # Store original content for comparison
+            if not st.session_state.edit_mode or st.session_state.original_content == "":
+                st.session_state.original_content = content
+                if not st.session_state.edit_mode:
+                    st.session_state.editor_content = content
+            
             if content.strip():
-                # Render markdown
-                html_content = render_markdown(content)
+                # Handle different layouts based on edit mode
+                if st.session_state.edit_mode:
+                    if st.session_state.editor_layout == "inline":
+                        # Show only editor
+                        st.subheader("✏️ Editing Mode")
+                        render_editor_toolbar()
+                        
+                        # Editor component
+                        edited_content = st_ace(
+                            value=st.session_state.editor_content,
+                            language='markdown',
+                            theme='github',
+                            key='markdown_editor',
+                            height=600,
+                            auto_update=True,
+                            font_size=14,
+                            tab_size=2,
+                            wrap=True,
+                            annotations=None,
+                            markers=None,
+                        )
+                        
+                        # Update editor content and check for changes
+                        if edited_content != st.session_state.editor_content:
+                            st.session_state.editor_content = edited_content
+                            st.session_state.has_unsaved_changes = check_unsaved_changes()
+                            st.rerun()
+                    
+                    elif st.session_state.editor_layout == "side-by-side":
+                        # Show editor and preview side by side
+                        col1, col2 = st.columns(2)
+                        
+                        with col1:
+                            st.subheader("✏️ Editor")
+                            render_editor_toolbar()
+                            
+                            edited_content = st_ace(
+                                value=st.session_state.editor_content,
+                                language='markdown',
+                                theme='github',
+                                key='markdown_editor_sidebyside',
+                                height=600,
+                                auto_update=True,
+                                font_size=14,
+                                tab_size=2,
+                                wrap=True
+                            )
+                            
+                            if edited_content != st.session_state.editor_content:
+                                st.session_state.editor_content = edited_content
+                                st.session_state.has_unsaved_changes = check_unsaved_changes()
+                                st.rerun()
+                        
+                        with col2:
+                            st.subheader("👁️ Live Preview")
+                            preview_content = render_markdown(st.session_state.editor_content)
+                            st.markdown(preview_content, unsafe_allow_html=True)
+                    
+                    elif st.session_state.editor_layout == "tabbed":
+                        # Show tabs for editor and preview
+                        tab1, tab2 = st.tabs(["✏️ Editor", "👁️ Preview"])
+                        
+                        with tab1:
+                            render_editor_toolbar()
+                            
+                            edited_content = st_ace(
+                                value=st.session_state.editor_content,
+                                language='markdown',
+                                theme='github',
+                                key='markdown_editor_tabbed',
+                                height=600,
+                                auto_update=True,
+                                font_size=14,
+                                tab_size=2,
+                                wrap=True
+                            )
+                            
+                            if edited_content != st.session_state.editor_content:
+                                st.session_state.editor_content = edited_content
+                                st.session_state.has_unsaved_changes = check_unsaved_changes()
+                                st.rerun()
+                        
+                        with tab2:
+                            preview_content = render_markdown(st.session_state.editor_content)
+                            st.markdown(preview_content, unsafe_allow_html=True)
                 
-                
-                # Display the rendered markdown using HTML component
-                import streamlit.components.v1 as components
-                
-                # Get the base directory for resolving relative links
-                base_dir = os.path.dirname(selected_file_path)
-                
-                full_html = f'''
+                else:
+                    # View mode - show rendered markdown
+                    html_content = render_markdown(content)
+                    
+                    # Display the rendered markdown using HTML component
+                    import streamlit.components.v1 as components
+                    
+                    # Get the base directory for resolving relative links
+                    base_dir = os.path.dirname(selected_file_path)
+                    
+                    full_html = f'''
                 <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
                     <style>
                         .markdown-content {{
@@ -384,7 +574,7 @@ def main():
                                                     
                                                     // Navigate using URL parameters
                                                     const currentUrl = new URL(window.parent.location);
-                                                    currentUrl.searchParams.set('navigate_to', targetPath.replace(/\//g, '\\\\'));
+                                                    currentUrl.searchParams.set('navigate_to', targetPath.replace(/\\//g, '\\\\\\\\'));
                                                     window.parent.location.href = currentUrl.toString();
                                                     debugLog('Attempting URL navigation to:', targetPath);
                                                 }} catch (e4) {{
@@ -408,56 +598,62 @@ def main():
                     </div>
                 </div>
                 '''
-                
-                # Create an interactive component that can communicate back to Streamlit
-                clicked_link = components.html(
-                    full_html,
-                    height=800,
-                    scrolling=True
-                )
-                
-                # Debug toggle in sidebar
-                show_debug = st.sidebar.checkbox("🐛 Show Debug Info", value=False, help="Show debugging information for link navigation")
-                
-                # Debug: Show component return value
-                if show_debug and clicked_link:
-                    st.sidebar.write("**Debug - Component returned:**", clicked_link)
-                
-                # Handle link navigation
-                if clicked_link and isinstance(clicked_link, dict) and clicked_link.get('action') == 'navigate_to_file':
-                    href = clicked_link.get('href')
-                    base_dir = clicked_link.get('baseDir', '').replace('/', os.sep)
                     
-                    if show_debug:
-                        st.sidebar.write(f"**Debug - Navigating to:** {href}")
-                        st.sidebar.write(f"**Debug - Base dir:** {base_dir}")
+                    # Create an interactive component that can communicate back to Streamlit
+                    clicked_link = components.html(
+                        full_html,
+                        height=800,
+                        scrolling=True
+                    )
                     
-                    if href:
-                        # Resolve the target file path
-                        target_path = resolve_markdown_link(selected_file_path, href)
+                    # Debug toggle in sidebar
+                    show_debug = st.sidebar.checkbox("🐛 Show Debug Info", value=False, help="Show debugging information for link navigation")
+                    
+                    # Debug: Show component return value
+                    if show_debug and clicked_link:
+                        st.sidebar.write("**Debug - Component returned:**", clicked_link)
+                    
+                    # Handle link navigation
+                    if clicked_link and isinstance(clicked_link, dict) and clicked_link.get('action') == 'navigate_to_file':
+                        href = clicked_link.get('href')
+                        base_dir = clicked_link.get('baseDir', '').replace('/', os.sep)
                         
                         if show_debug:
-                            st.sidebar.write(f"**Debug - Resolved path:** {target_path}")
+                            st.sidebar.write(f"**Debug - Navigating to:** {href}")
+                            st.sidebar.write(f"**Debug - Base dir:** {base_dir}")
                         
-                        if target_path and os.path.exists(target_path):
+                        if href:
+                            # Resolve the target file path
+                            target_path = resolve_markdown_link(selected_file_path, href)
+                            
                             if show_debug:
-                                st.sidebar.success(f"**Debug - File found, navigating to:** {target_path}")
+                                st.sidebar.write(f"**Debug - Resolved path:** {target_path}")
                             
-                            # Update session state to navigate to the new file
-                            st.session_state.selected_file = target_path
-                            st.session_state.file_name = os.path.basename(target_path)
-                            st.session_state.last_selected_file = target_path
-                            
-                            # Update the folder path to the new file's directory if needed
-                            new_dir = os.path.dirname(target_path)
-                            if new_dir != st.session_state.get('last_folder_path'):
-                                st.session_state.last_folder_path = new_dir
-                            
-                            # Rerun to update the display
-                            st.rerun()
-                        else:
-                            st.error(f"Could not find markdown file: {href}")
-                            st.info(f"Attempted path: {target_path if target_path else 'Could not resolve'}")
+                            if target_path and os.path.exists(target_path):
+                                if show_debug:
+                                    st.sidebar.success(f"**Debug - File found, navigating to:** {target_path}")
+                                
+                                # Update session state to navigate to the new file
+                                st.session_state.selected_file = target_path
+                                st.session_state.file_name = os.path.basename(target_path)
+                                st.session_state.last_selected_file = target_path
+                                
+                                # Reset editor state when navigating to new file
+                                st.session_state.edit_mode = False
+                                st.session_state.editor_content = ""
+                                st.session_state.original_content = ""
+                                st.session_state.has_unsaved_changes = False
+                                
+                                # Update the folder path to the new file's directory if needed
+                                new_dir = os.path.dirname(target_path)
+                                if new_dir != st.session_state.get('last_folder_path'):
+                                    st.session_state.last_folder_path = new_dir
+                                
+                                # Rerun to update the display
+                                st.rerun()
+                            else:
+                                st.error(f"Could not find markdown file: {href}")
+                                st.info(f"Attempted path: {target_path if target_path else 'Could not resolve'}")
             else:
                 st.info("This file is empty.")
                 
