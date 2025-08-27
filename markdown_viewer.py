@@ -91,6 +91,8 @@ def initialize_session_state():
         st.session_state.ai_last_template_used = ""
     if 'ai_summary_tokens' not in st.session_state:
         st.session_state.ai_summary_tokens = None
+    if 'ai_summary_layout' not in st.session_state:
+        st.session_state.ai_summary_layout = "sidebar"  # sidebar, side-by-side, tabbed
 
 def toggle_edit_mode():
     """Toggle between view and edit modes"""
@@ -118,6 +120,232 @@ def check_unsaved_changes():
     if hasattr(st.session_state, 'editor_content') and hasattr(st.session_state, 'original_content'):
         return st.session_state.editor_content != st.session_state.original_content
     return False
+
+def render_markdown_component(html_content, selected_file_path):
+    """Render the markdown HTML component"""
+    import streamlit.components.v1 as components
+    
+    # Get the base directory for resolving relative links
+    base_dir = os.path.dirname(selected_file_path)
+    
+    full_html = f'''
+<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+    <style>
+        .markdown-content {{
+            line-height: 1.6;
+            font-size: 16px;
+            color: #333;
+        }}
+        .markdown-content h1, .markdown-content h2, .markdown-content h3 {{
+            margin-top: 1.5em;
+            margin-bottom: 0.5em;
+            color: #1f2937;
+        }}
+        .markdown-content pre {{
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 1rem;
+            overflow-x: auto;
+            margin: 1em 0;
+        }}
+        .markdown-content code {{
+            background-color: #f8f9fa;
+            padding: 0.2em 0.4em;
+            border-radius: 3px;
+            font-size: 0.9em;
+            font-family: 'Monaco', 'Consolas', 'Courier New', monospace;
+        }}
+        .markdown-content pre code {{
+            background: transparent;
+            padding: 0;
+        }}
+        .markdown-content table {{
+            border-collapse: collapse;
+            width: 100%;
+            margin: 1em 0;
+        }}
+        .markdown-content th, .markdown-content td {{
+            border: 1px solid #ddd;
+            padding: 8px 12px;
+            text-align: left;
+        }}
+        .markdown-content th {{
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }}
+        .highlight {{
+            background-color: #f6f8fa;
+            border-radius: 6px;
+            margin: 1em 0;
+            border: 1px solid #d1d9e0;
+        }}
+        .highlight pre {{
+            margin: 0;
+            background: transparent;
+            border: none;
+        }}
+        
+        /* Syntax highlighting colors - GitHub style */
+        .highlight .k {{ color: #d73a49; font-weight: bold; }} /* Keywords */
+        .highlight .kd {{ color: #d73a49; font-weight: bold; }} /* Keyword declarations */
+        .highlight .kt {{ color: #d73a49; font-weight: bold; }} /* Keyword types */
+        .highlight .s {{ color: #032f62; }} /* Strings */
+        .highlight .s1 {{ color: #032f62; }} /* Single quoted strings */
+        .highlight .s2 {{ color: #032f62; }} /* Double quoted strings */
+        .highlight .sb {{ color: #032f62; }} /* Backtick strings */
+        .highlight .sc {{ color: #032f62; }} /* String chars */
+        .highlight .sd {{ color: #032f62; }} /* String docs */
+        .highlight .se {{ color: #032f62; }} /* String escapes */
+        .highlight .sh {{ color: #032f62; }} /* String heredoc */
+        .highlight .si {{ color: #032f62; }} /* String interpolated */
+        .highlight .sx {{ color: #032f62; }} /* String other */
+        .highlight .sr {{ color: #032f62; }} /* String regex */
+        .highlight .ss {{ color: #032f62; }} /* String symbol */
+        .highlight .c {{ color: #6a737d; font-style: italic; }} /* Comments */
+        .highlight .c1 {{ color: #6a737d; font-style: italic; }} /* Single line comments */
+        .highlight .cm {{ color: #6a737d; font-style: italic; }} /* Multi-line comments */
+        .highlight .cp {{ color: #6a737d; font-style: italic; }} /* Preprocessor comments */
+        .highlight .cs {{ color: #6a737d; font-style: italic; }} /* Comment special */
+        .highlight .n {{ color: #24292e; }} /* Names */
+        .highlight .na {{ color: #6f42c1; }} /* Name attributes */
+        .highlight .nb {{ color: #005cc5; }} /* Name builtins */
+        .highlight .nc {{ color: #6f42c1; }} /* Name class */
+        .highlight .nd {{ color: #6f42c1; }} /* Name decorator */
+        .highlight .ne {{ color: #6f42c1; }} /* Name exception */
+        .highlight .nf {{ color: #6f42c1; }} /* Name function */
+        .highlight .ni {{ color: #005cc5; }} /* Name entity */
+        .highlight .nl {{ color: #005cc5; }} /* Name label */
+        .highlight .nn {{ color: #6f42c1; }} /* Name namespace */
+        .highlight .no {{ color: #005cc5; }} /* Name constant */
+        .highlight .nt {{ color: #22863a; }} /* Name tag */
+        .highlight .nv {{ color: #e36209; }} /* Name variable */
+        .highlight .nx {{ color: #24292e; }} /* Name other */
+        .highlight .o {{ color: #d73a49; }} /* Operators */
+        .highlight .ow {{ color: #d73a49; }} /* Operator word */
+        .highlight .p {{ color: #24292e; }} /* Punctuation */
+        .highlight .m {{ color: #005cc5; }} /* Numbers */
+        .highlight .mf {{ color: #005cc5; }} /* Float */
+        .highlight .mh {{ color: #005cc5; }} /* Hex */
+        .highlight .mi {{ color: #005cc5; }} /* Integer */
+        .highlight .mo {{ color: #005cc5; }} /* Octal */
+        .highlight .mb {{ color: #005cc5; }} /* Binary */
+        .highlight .il {{ color: #005cc5; }} /* Integer long */
+        .highlight .err {{ color: #cb2431; background-color: #ffeef0; }} /* Errors */
+        .highlight .gh {{ color: #005cc5; font-weight: bold; }} /* Generic heading */
+        .highlight .gi {{ color: #22863a; background-color: #f0fff4; }} /* Generic inserted */
+        .highlight .gd {{ color: #cb2431; background-color: #ffeef0; }} /* Generic deleted */
+        .highlight .ge {{ font-style: italic; }} /* Generic emphasis */
+        .highlight .gr {{ color: #cb2431; }} /* Generic error */
+        .highlight .gs {{ font-weight: bold; }} /* Generic strong */
+        .highlight .gu {{ color: #6f42c1; font-weight: bold; }} /* Generic subheading */
+        .highlight .w {{ color: #24292e; }} /* Whitespace */
+    </style>
+    <script>
+        // Debug function to log messages
+        function debugLog(message) {{
+            console.log('[Markdown Viewer Debug]', message);
+        }}
+
+        document.addEventListener('DOMContentLoaded', function() {{
+            debugLog('DOM loaded, setting up link listeners');
+            
+            // Intercept clicks on links
+            document.addEventListener('click', function(e) {{
+                debugLog('Click detected on:', e.target.tagName, e.target.href);
+                
+                if (e.target.tagName === 'A') {{
+                    const href = e.target.getAttribute('href');
+                    debugLog('Link href:', href);
+                    
+                    // Check if it's a local markdown file link
+                    if (href && !href.startsWith('http://') && !href.startsWith('https://') && !href.startsWith('#')) {{
+                        debugLog('Local link detected:', href);
+                        
+                        // Check if it's a markdown file
+                        if (href.toLowerCase().endsWith('.md') || href.toLowerCase().endsWith('.markdown')) {{
+                            debugLog('Markdown file link - preventing default and sending to Streamlit');
+                            e.preventDefault();
+                            
+                            // Try multiple communication methods
+                            const linkData = {{
+                                action: 'navigate_to_file',
+                                href: href,
+                                baseDir: '{base_dir.replace(os.sep, "/")}'
+                            }};
+                            
+                            // Method 1: Streamlit component communication
+                            try {{
+                                window.parent.postMessage({{
+                                    type: "streamlit:setComponentValue",
+                                    value: linkData
+                                }}, "*");
+                                debugLog('Sent via postMessage method 1');
+                            }} catch (e1) {{
+                                debugLog('Method 1 failed:', e1);
+                            }}
+                            
+                            // Method 2: Try different postMessage format
+                            try {{
+                                window.parent.postMessage(linkData, "*");
+                                debugLog('Sent via postMessage method 2');
+                            }} catch (e2) {{
+                                debugLog('Method 2 failed:', e2);
+                            }}
+                            
+                            // Method 3: Store in localStorage and trigger custom event
+                            try {{
+                                localStorage.setItem('markdown_navigation', JSON.stringify(linkData));
+                                window.dispatchEvent(new CustomEvent('markdown_link_clicked', {{ detail: linkData }}));
+                                debugLog('Stored in localStorage and triggered event');
+                            }} catch (e3) {{
+                                debugLog('Method 3 failed:', e3);
+                            }}
+                            
+                            // Method 4: URL navigation fallback
+                            setTimeout(function() {{
+                                try {{
+                                    // Resolve the full path
+                                    let targetPath = href;
+                                    if (!href.startsWith('/')) {{
+                                        targetPath = '{base_dir.replace(os.sep, "/").replace(os.sep, "/")}/' + href;
+                                    }}
+                                    
+                                    // Navigate using URL parameters
+                                    const currentUrl = new URL(window.parent.location);
+                                    currentUrl.searchParams.set('navigate_to', targetPath.replace(/\\//g, '\\\\\\\\'));
+                                    window.parent.location.href = currentUrl.toString();
+                                    debugLog('Attempting URL navigation to:', targetPath);
+                                }} catch (e4) {{
+                                    debugLog('Method 4 failed:', e4);
+                                }}
+                            }}, 100);
+                        }} else {{
+                            debugLog('Not a markdown file:', href);
+                        }}
+                    }} else {{
+                        debugLog('External or anchor link, allowing default behavior:', href);
+                    }}
+                }}
+            }});
+            
+            debugLog('Link listener setup complete');
+        }});
+    </script>
+    <div class="markdown-content">
+        {html_content}
+    </div>
+</div>
+'''
+    
+    # Create an interactive component that can communicate back to Streamlit
+    clicked_link = components.html(
+        full_html,
+        height=800,
+        scrolling=True
+    )
+    
+    return clicked_link
 
 def render_editor_toolbar():
     """Render the editor toolbar with formatting buttons"""
@@ -367,6 +595,16 @@ def main():
                 template_info = templates[selected_template_key]
                 st.caption(f"📝 {template_info['description']}")
                 
+                # Layout selector (only show when there's a summary)
+                if st.session_state.ai_summary:
+                    st.session_state.ai_summary_layout = st.radio(
+                        "Display layout:",
+                        ["sidebar", "side-by-side", "tabbed"],
+                        index=["sidebar", "side-by-side", "tabbed"].index(st.session_state.ai_summary_layout),
+                        help="Choose how to display the summary",
+                        horizontal=True
+                    )
+                
                 # Generate button
                 generate_disabled = st.session_state.ai_generating
                 generate_text = "🔄 Generating..." if st.session_state.ai_generating else "✨ Generate Summary"
@@ -428,8 +666,11 @@ def main():
                         st.session_state.ai_generating = False
                         st.rerun()
                 
-                # Display existing summary
-                if st.session_state.ai_summary and not st.session_state.ai_generating:
+                # Display existing summary in sidebar (only for sidebar layout)
+                if (st.session_state.ai_summary and 
+                    not st.session_state.ai_generating and 
+                    st.session_state.ai_summary_layout == "sidebar"):
+                    
                     st.subheader("📄 Summary")
                     if st.session_state.ai_last_template_used:
                         st.caption(f"Generated using: {st.session_state.ai_last_template_used}")
@@ -443,21 +684,41 @@ def main():
                     
                     with col1:
                         # Copy button (using st.code for easy copying)
-                        if st.button("📋 Copy Summary", use_container_width=True):
+                        if st.button("📋 Copy Summary", use_container_width=True, key="sidebar_copy"):
                             st.code(st.session_state.ai_summary, language=None)
                             st.success("Summary copied to view! Use Ctrl+A, Ctrl+C to copy.")
                     
                     with col2:
                         # Download button
-                        if st.button("📥 Download Summary", use_container_width=True):
+                        if st.button("📥 Download Summary", use_container_width=True, key="sidebar_download"):
                             filename = f"{st.session_state.get('file_name', 'document')}_summary.md"
                             st.download_button(
                                 label="📥 Download as Markdown",
                                 data=st.session_state.ai_summary,
                                 file_name=filename,
                                 mime="text/markdown",
-                                use_container_width=True
+                                use_container_width=True,
+                                key="sidebar_download_btn"
                             )
+                
+                # Show info for other layouts
+                elif (st.session_state.ai_summary and 
+                      not st.session_state.ai_generating and 
+                      st.session_state.ai_summary_layout != "sidebar"):
+                    st.info(f"📄 Summary available in {st.session_state.ai_summary_layout} layout below")
+                    if st.session_state.ai_last_template_used:
+                        st.caption(f"Generated using: {st.session_state.ai_last_template_used}")
+                    
+                    # Just show download button in sidebar for convenience
+                    filename = f"{st.session_state.get('file_name', 'document')}_summary.md"
+                    st.download_button(
+                        label="📥 Download Summary",
+                        data=st.session_state.ai_summary,
+                        file_name=filename,
+                        mime="text/markdown",
+                        use_container_width=True,
+                        key="sidebar_download_btn_alt"
+                    )
     
     # Main content area
     if 'selected_file' in st.session_state and os.path.exists(st.session_state.selected_file):
@@ -572,231 +833,86 @@ def main():
                             st.markdown(preview_content, unsafe_allow_html=True)
                 
                 else:
-                    # View mode - show rendered markdown
+                    # View mode - show rendered markdown with AI summary layouts
                     html_content = render_markdown(content)
                     
-                    # Display the rendered markdown using HTML component
-                    import streamlit.components.v1 as components
+                    # Check if we need to display in special layout with AI summary
+                    has_summary = (st.session_state.ai_summary and 
+                                 not st.session_state.ai_generating and
+                                 st.session_state.ai_summary_layout != "sidebar")
                     
-                    # Get the base directory for resolving relative links
-                    base_dir = os.path.dirname(selected_file_path)
-                    
-                    full_html = f'''
-                <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-                    <style>
-                        .markdown-content {{
-                            line-height: 1.6;
-                            font-size: 16px;
-                            color: #333;
-                        }}
-                        .markdown-content h1, .markdown-content h2, .markdown-content h3 {{
-                            margin-top: 1.5em;
-                            margin-bottom: 0.5em;
-                            color: #1f2937;
-                        }}
-                        .markdown-content pre {{
-                            background-color: #f8f9fa;
-                            border: 1px solid #e9ecef;
-                            border-radius: 4px;
-                            padding: 1rem;
-                            overflow-x: auto;
-                            margin: 1em 0;
-                        }}
-                        .markdown-content code {{
-                            background-color: #f8f9fa;
-                            padding: 0.2em 0.4em;
-                            border-radius: 3px;
-                            font-size: 0.9em;
-                            font-family: 'Monaco', 'Consolas', 'Courier New', monospace;
-                        }}
-                        .markdown-content pre code {{
-                            background: transparent;
-                            padding: 0;
-                        }}
-                        .markdown-content table {{
-                            border-collapse: collapse;
-                            width: 100%;
-                            margin: 1em 0;
-                        }}
-                        .markdown-content th, .markdown-content td {{
-                            border: 1px solid #ddd;
-                            padding: 8px 12px;
-                            text-align: left;
-                        }}
-                        .markdown-content th {{
-                            background-color: #f2f2f2;
-                            font-weight: bold;
-                        }}
-                        .highlight {{
-                            background-color: #f6f8fa;
-                            border-radius: 6px;
-                            margin: 1em 0;
-                            border: 1px solid #d1d9e0;
-                        }}
-                        .highlight pre {{
-                            margin: 0;
-                            background: transparent;
-                            border: none;
-                        }}
+                    if has_summary and st.session_state.ai_summary_layout == "side-by-side":
+                        # Side-by-side layout: markdown on left, summary on right
+                        col1, col2 = st.columns(2)
                         
-                        /* Syntax highlighting colors - GitHub style */
-                        .highlight .k {{ color: #d73a49; font-weight: bold; }} /* Keywords */
-                        .highlight .kd {{ color: #d73a49; font-weight: bold; }} /* Keyword declarations */
-                        .highlight .kt {{ color: #d73a49; font-weight: bold; }} /* Keyword types */
-                        .highlight .s {{ color: #032f62; }} /* Strings */
-                        .highlight .s1 {{ color: #032f62; }} /* Single quoted strings */
-                        .highlight .s2 {{ color: #032f62; }} /* Double quoted strings */
-                        .highlight .sb {{ color: #032f62; }} /* Backtick strings */
-                        .highlight .sc {{ color: #032f62; }} /* String chars */
-                        .highlight .sd {{ color: #032f62; }} /* String docs */
-                        .highlight .se {{ color: #032f62; }} /* String escapes */
-                        .highlight .sh {{ color: #032f62; }} /* String heredoc */
-                        .highlight .si {{ color: #032f62; }} /* String interpolated */
-                        .highlight .sx {{ color: #032f62; }} /* String other */
-                        .highlight .sr {{ color: #032f62; }} /* String regex */
-                        .highlight .ss {{ color: #032f62; }} /* String symbol */
-                        .highlight .c {{ color: #6a737d; font-style: italic; }} /* Comments */
-                        .highlight .c1 {{ color: #6a737d; font-style: italic; }} /* Single line comments */
-                        .highlight .cm {{ color: #6a737d; font-style: italic; }} /* Multi-line comments */
-                        .highlight .cp {{ color: #6a737d; font-style: italic; }} /* Preprocessor comments */
-                        .highlight .cs {{ color: #6a737d; font-style: italic; }} /* Comment special */
-                        .highlight .n {{ color: #24292e; }} /* Names */
-                        .highlight .na {{ color: #6f42c1; }} /* Name attributes */
-                        .highlight .nb {{ color: #005cc5; }} /* Name builtins */
-                        .highlight .nc {{ color: #6f42c1; }} /* Name class */
-                        .highlight .nd {{ color: #6f42c1; }} /* Name decorator */
-                        .highlight .ne {{ color: #6f42c1; }} /* Name exception */
-                        .highlight .nf {{ color: #6f42c1; }} /* Name function */
-                        .highlight .ni {{ color: #005cc5; }} /* Name entity */
-                        .highlight .nl {{ color: #005cc5; }} /* Name label */
-                        .highlight .nn {{ color: #6f42c1; }} /* Name namespace */
-                        .highlight .no {{ color: #005cc5; }} /* Name constant */
-                        .highlight .nt {{ color: #22863a; }} /* Name tag */
-                        .highlight .nv {{ color: #e36209; }} /* Name variable */
-                        .highlight .nx {{ color: #24292e; }} /* Name other */
-                        .highlight .o {{ color: #d73a49; }} /* Operators */
-                        .highlight .ow {{ color: #d73a49; }} /* Operator word */
-                        .highlight .p {{ color: #24292e; }} /* Punctuation */
-                        .highlight .m {{ color: #005cc5; }} /* Numbers */
-                        .highlight .mf {{ color: #005cc5; }} /* Float */
-                        .highlight .mh {{ color: #005cc5; }} /* Hex */
-                        .highlight .mi {{ color: #005cc5; }} /* Integer */
-                        .highlight .mo {{ color: #005cc5; }} /* Octal */
-                        .highlight .mb {{ color: #005cc5; }} /* Binary */
-                        .highlight .il {{ color: #005cc5; }} /* Integer long */
-                        .highlight .err {{ color: #cb2431; background-color: #ffeef0; }} /* Errors */
-                        .highlight .gh {{ color: #005cc5; font-weight: bold; }} /* Generic heading */
-                        .highlight .gi {{ color: #22863a; background-color: #f0fff4; }} /* Generic inserted */
-                        .highlight .gd {{ color: #cb2431; background-color: #ffeef0; }} /* Generic deleted */
-                        .highlight .ge {{ font-style: italic; }} /* Generic emphasis */
-                        .highlight .gr {{ color: #cb2431; }} /* Generic error */
-                        .highlight .gs {{ font-weight: bold; }} /* Generic strong */
-                        .highlight .gu {{ color: #6f42c1; font-weight: bold; }} /* Generic subheading */
-                        .highlight .w {{ color: #24292e; }} /* Whitespace */
-                    </style>
-                    <script>
-                        // Debug function to log messages
-                        function debugLog(message) {{
-                            console.log('[Markdown Viewer Debug]', message);
-                        }}
-
-                        document.addEventListener('DOMContentLoaded', function() {{
-                            debugLog('DOM loaded, setting up link listeners');
+                        with col1:
+                            st.subheader("📄 Document")
+                            # Display the rendered markdown using HTML component
+                            clicked_link = render_markdown_component(html_content, selected_file_path)
+                        
+                        with col2:
+                            st.subheader("🤖 AI Summary")
+                            if st.session_state.ai_last_template_used:
+                                st.caption(f"Generated using: {st.session_state.ai_last_template_used}")
                             
-                            // Intercept clicks on links
-                            document.addEventListener('click', function(e) {{
-                                debugLog('Click detected on:', e.target.tagName, e.target.href);
-                                
-                                if (e.target.tagName === 'A') {{
-                                    const href = e.target.getAttribute('href');
-                                    debugLog('Link href:', href);
-                                    
-                                    // Check if it's a local markdown file link
-                                    if (href && !href.startsWith('http://') && !href.startsWith('https://') && !href.startsWith('#')) {{
-                                        debugLog('Local link detected:', href);
-                                        
-                                        // Check if it's a markdown file
-                                        if (href.toLowerCase().endsWith('.md') || href.toLowerCase().endsWith('.markdown')) {{
-                                            debugLog('Markdown file link - preventing default and sending to Streamlit');
-                                            e.preventDefault();
-                                            
-                                            // Try multiple communication methods
-                                            const linkData = {{
-                                                action: 'navigate_to_file',
-                                                href: href,
-                                                baseDir: '{base_dir.replace(os.sep, "/")}'
-                                            }};
-                                            
-                                            // Method 1: Streamlit component communication
-                                            try {{
-                                                window.parent.postMessage({{
-                                                    type: "streamlit:setComponentValue",
-                                                    value: linkData
-                                                }}, "*");
-                                                debugLog('Sent via postMessage method 1');
-                                            }} catch (e1) {{
-                                                debugLog('Method 1 failed:', e1);
-                                            }}
-                                            
-                                            // Method 2: Try different postMessage format
-                                            try {{
-                                                window.parent.postMessage(linkData, "*");
-                                                debugLog('Sent via postMessage method 2');
-                                            }} catch (e2) {{
-                                                debugLog('Method 2 failed:', e2);
-                                            }}
-                                            
-                                            // Method 3: Store in localStorage and trigger custom event
-                                            try {{
-                                                localStorage.setItem('markdown_navigation', JSON.stringify(linkData));
-                                                window.dispatchEvent(new CustomEvent('markdown_link_clicked', {{ detail: linkData }}));
-                                                debugLog('Stored in localStorage and triggered event');
-                                            }} catch (e3) {{
-                                                debugLog('Method 3 failed:', e3);
-                                            }}
-                                            
-                                            // Method 4: URL navigation fallback
-                                            setTimeout(function() {{
-                                                try {{
-                                                    // Resolve the full path
-                                                    let targetPath = href;
-                                                    if (!href.startsWith('/')) {{
-                                                        targetPath = '{base_dir.replace(os.sep, "/").replace(os.sep, "/")}/' + href;
-                                                    }}
-                                                    
-                                                    // Navigate using URL parameters
-                                                    const currentUrl = new URL(window.parent.location);
-                                                    currentUrl.searchParams.set('navigate_to', targetPath.replace(/\\//g, '\\\\\\\\'));
-                                                    window.parent.location.href = currentUrl.toString();
-                                                    debugLog('Attempting URL navigation to:', targetPath);
-                                                }} catch (e4) {{
-                                                    debugLog('Method 4 failed:', e4);
-                                                }}
-                                            }}, 100);
-                                        }} else {{
-                                            debugLog('Not a markdown file:', href);
-                                        }}
-                                    }} else {{
-                                        debugLog('External or anchor link, allowing default behavior:', href);
-                                    }}
-                                }}
-                            }});
+                            # Summary content
+                            st.markdown(st.session_state.ai_summary)
                             
-                            debugLog('Link listener setup complete');
-                        }});
-                    </script>
-                    <div class="markdown-content">
-                        {html_content}
-                    </div>
-                </div>
-                '''
+                            # Action buttons
+                            col_copy, col_download = st.columns(2)
+                            with col_copy:
+                                if st.button("📋 Copy", use_container_width=True, key="main_copy"):
+                                    st.code(st.session_state.ai_summary, language=None)
+                                    st.success("Summary ready to copy!")
+                            
+                            with col_download:
+                                filename = f"{st.session_state.get('file_name', 'document')}_summary.md"
+                                st.download_button(
+                                    label="📥 Download",
+                                    data=st.session_state.ai_summary,
+                                    file_name=filename,
+                                    mime="text/markdown",
+                                    use_container_width=True,
+                                    key="main_download_btn"
+                                )
                     
-                    # Create an interactive component that can communicate back to Streamlit
-                    clicked_link = components.html(
-                        full_html,
-                        height=800,
-                        scrolling=True
-                    )
+                    elif has_summary and st.session_state.ai_summary_layout == "tabbed":
+                        # Tabbed layout: tabs for markdown and summary
+                        tab1, tab2 = st.tabs(["📄 Document", "🤖 AI Summary"])
+                        
+                        with tab1:
+                            # Display the rendered markdown using HTML component
+                            clicked_link = render_markdown_component(html_content, selected_file_path)
+                        
+                        with tab2:
+                            if st.session_state.ai_last_template_used:
+                                st.caption(f"Generated using: {st.session_state.ai_last_template_used}")
+                            
+                            # Summary content
+                            st.markdown(st.session_state.ai_summary)
+                            
+                            # Action buttons
+                            col_copy, col_download = st.columns(2)
+                            with col_copy:
+                                if st.button("📋 Copy Summary", use_container_width=True, key="tab_copy"):
+                                    st.code(st.session_state.ai_summary, language=None)
+                                    st.success("Summary ready to copy!")
+                            
+                            with col_download:
+                                filename = f"{st.session_state.get('file_name', 'document')}_summary.md"
+                                st.download_button(
+                                    label="📥 Download Summary",
+                                    data=st.session_state.ai_summary,
+                                    file_name=filename,
+                                    mime="text/markdown",
+                                    use_container_width=True,
+                                    key="tab_download_btn"
+                                )
+                    
+                    else:
+                        # Default layout (sidebar or no summary)
+                        # Display the rendered markdown using HTML component
+                        clicked_link = render_markdown_component(html_content, selected_file_path)
                     
                     # Debug toggle in sidebar
                     show_debug = st.sidebar.checkbox("🐛 Show Debug Info", value=False, help="Show debugging information for link navigation")
@@ -805,7 +921,7 @@ def main():
                     if show_debug and clicked_link:
                         st.sidebar.write("**Debug - Component returned:**", clicked_link)
                     
-                    # Handle link navigation
+                    # Handle link navigation (works for all layouts since clicked_link is always set)
                     if clicked_link and isinstance(clicked_link, dict) and clicked_link.get('action') == 'navigate_to_file':
                         href = clicked_link.get('href')
                         base_dir = clicked_link.get('baseDir', '').replace('/', os.sep)
