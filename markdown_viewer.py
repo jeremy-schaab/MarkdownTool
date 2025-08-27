@@ -69,6 +69,19 @@ def main():
         initial_sidebar_state="expanded"
     )
     
+    # Check for navigation via URL parameters
+    query_params = st.query_params
+    if 'navigate_to' in query_params:
+        nav_file = query_params['navigate_to']
+        if os.path.exists(nav_file) and nav_file.lower().endswith(('.md', '.markdown')):
+            st.session_state.selected_file = nav_file
+            st.session_state.file_name = os.path.basename(nav_file)
+            st.session_state.last_selected_file = nav_file
+            st.session_state.last_folder_path = os.path.dirname(nav_file)
+            # Clear the query parameter
+            st.query_params.clear()
+            st.rerun()
+    
     st.title("📄 Markdown File Viewer")
     
     # Sidebar with file selection
@@ -300,35 +313,94 @@ def main():
                         .highlight .w {{ color: #24292e; }} /* Whitespace */
                     </style>
                     <script>
-                        function sendToStreamlit(data) {{
-                            window.parent.postMessage({{
-                                type: "streamlit:setComponentValue",
-                                value: data
-                            }}, "*");
+                        // Debug function to log messages
+                        function debugLog(message) {{
+                            console.log('[Markdown Viewer Debug]', message);
                         }}
 
                         document.addEventListener('DOMContentLoaded', function() {{
+                            debugLog('DOM loaded, setting up link listeners');
+                            
                             // Intercept clicks on links
                             document.addEventListener('click', function(e) {{
-                                if (e.target.tagName === 'A' && e.target.href) {{
+                                debugLog('Click detected on:', e.target.tagName, e.target.href);
+                                
+                                if (e.target.tagName === 'A') {{
                                     const href = e.target.getAttribute('href');
+                                    debugLog('Link href:', href);
                                     
                                     // Check if it's a local markdown file link
                                     if (href && !href.startsWith('http://') && !href.startsWith('https://') && !href.startsWith('#')) {{
+                                        debugLog('Local link detected:', href);
+                                        
                                         // Check if it's a markdown file
                                         if (href.toLowerCase().endsWith('.md') || href.toLowerCase().endsWith('.markdown')) {{
+                                            debugLog('Markdown file link - preventing default and sending to Streamlit');
                                             e.preventDefault();
                                             
-                                            // Send the link information back to Streamlit
-                                            sendToStreamlit({{
+                                            // Try multiple communication methods
+                                            const linkData = {{
                                                 action: 'navigate_to_file',
                                                 href: href,
                                                 baseDir: '{base_dir.replace(os.sep, "/")}'
-                                            }});
+                                            }};
+                                            
+                                            // Method 1: Streamlit component communication
+                                            try {{
+                                                window.parent.postMessage({{
+                                                    type: "streamlit:setComponentValue",
+                                                    value: linkData
+                                                }}, "*");
+                                                debugLog('Sent via postMessage method 1');
+                                            }} catch (e1) {{
+                                                debugLog('Method 1 failed:', e1);
+                                            }}
+                                            
+                                            // Method 2: Try different postMessage format
+                                            try {{
+                                                window.parent.postMessage(linkData, "*");
+                                                debugLog('Sent via postMessage method 2');
+                                            }} catch (e2) {{
+                                                debugLog('Method 2 failed:', e2);
+                                            }}
+                                            
+                                            // Method 3: Store in localStorage and trigger custom event
+                                            try {{
+                                                localStorage.setItem('markdown_navigation', JSON.stringify(linkData));
+                                                window.dispatchEvent(new CustomEvent('markdown_link_clicked', {{ detail: linkData }}));
+                                                debugLog('Stored in localStorage and triggered event');
+                                            }} catch (e3) {{
+                                                debugLog('Method 3 failed:', e3);
+                                            }}
+                                            
+                                            // Method 4: URL navigation fallback
+                                            setTimeout(function() {{
+                                                try {{
+                                                    // Resolve the full path
+                                                    let targetPath = href;
+                                                    if (!href.startsWith('/')) {{
+                                                        targetPath = '{base_dir.replace(os.sep, "/").replace(os.sep, "/")}/' + href;
+                                                    }}
+                                                    
+                                                    // Navigate using URL parameters
+                                                    const currentUrl = new URL(window.parent.location);
+                                                    currentUrl.searchParams.set('navigate_to', targetPath.replace(/\//g, '\\\\'));
+                                                    window.parent.location.href = currentUrl.toString();
+                                                    debugLog('Attempting URL navigation to:', targetPath);
+                                                }} catch (e4) {{
+                                                    debugLog('Method 4 failed:', e4);
+                                                }}
+                                            }}, 100);
+                                        }} else {{
+                                            debugLog('Not a markdown file:', href);
                                         }}
+                                    }} else {{
+                                        debugLog('External or anchor link, allowing default behavior:', href);
                                     }}
                                 }}
                             }});
+                            
+                            debugLog('Link listener setup complete');
                         }});
                     </script>
                     <div class="markdown-content">
@@ -344,16 +416,25 @@ def main():
                     scrolling=True
                 )
                 
+                # Debug: Show component return value
+                if clicked_link:
+                    st.sidebar.write("Debug - Component returned:", clicked_link)
+                
                 # Handle link navigation
                 if clicked_link and isinstance(clicked_link, dict) and clicked_link.get('action') == 'navigate_to_file':
                     href = clicked_link.get('href')
                     base_dir = clicked_link.get('baseDir', '').replace('/', os.sep)
                     
+                    st.sidebar.write(f"Debug - Navigating to: {href}")
+                    st.sidebar.write(f"Debug - Base dir: {base_dir}")
+                    
                     if href:
                         # Resolve the target file path
                         target_path = resolve_markdown_link(selected_file_path, href)
+                        st.sidebar.write(f"Debug - Resolved path: {target_path}")
                         
                         if target_path and os.path.exists(target_path):
+                            st.sidebar.success(f"Debug - File found, navigating to: {target_path}")
                             # Update session state to navigate to the new file
                             st.session_state.selected_file = target_path
                             st.session_state.file_name = os.path.basename(target_path)
