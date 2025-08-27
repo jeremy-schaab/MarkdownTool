@@ -2,3 +2,5 @@ streamlit
 markdown
 pygments
 streamlit-ace
+openai
+python-dotenv

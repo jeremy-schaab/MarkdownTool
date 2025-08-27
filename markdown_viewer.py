@@ -6,6 +6,7 @@ from markdown.extensions import codehilite, fenced_code, tables, toc
 from streamlit_ace import st_ace
 import base64
 import tempfile
+from ai_service import ai_service
 
 def find_markdown_files(directory):
     """Recursively find all markdown files in a directory"""
@@ -78,6 +79,18 @@ def initialize_session_state():
         st.session_state.original_content = ""
     if 'confirm_save' not in st.session_state:
         st.session_state.confirm_save = False
+    
+    # AI summarization session state
+    if 'ai_summary' not in st.session_state:
+        st.session_state.ai_summary = ""
+    if 'ai_summary_template' not in st.session_state:
+        st.session_state.ai_summary_template = "high_level"
+    if 'ai_generating' not in st.session_state:
+        st.session_state.ai_generating = False
+    if 'ai_last_template_used' not in st.session_state:
+        st.session_state.ai_last_template_used = ""
+    if 'ai_summary_tokens' not in st.session_state:
+        st.session_state.ai_summary_tokens = None
 
 def toggle_edit_mode():
     """Toggle between view and edit modes"""
@@ -226,6 +239,13 @@ def main():
                 
                 # Store selected file in session state
                 if selected_file:
+                    # Reset AI summary when selecting new file
+                    if selected_file != st.session_state.get('selected_file'):
+                        st.session_state.ai_summary = ""
+                        st.session_state.ai_last_template_used = ""
+                        st.session_state.ai_summary_tokens = None
+                        st.session_state.ai_generating = False
+                    
                     st.session_state.selected_file = selected_file
                     
                 # Auto-reload last selected file if it still exists in current folder
@@ -316,6 +336,128 @@ def main():
                                 )
                 else:
                     st.info("💾 No changes to save")
+        
+        # AI Summarization section
+        if 'selected_file' in st.session_state and os.path.exists(st.session_state.selected_file):
+            st.divider()
+            st.subheader("🤖 AI Summary")
+            
+            # Check AI service configuration
+            if not ai_service.is_configured():
+                st.error("⚠️ AI service not configured. Please check your Azure OpenAI credentials in .env file.")
+            else:
+                # Template selector
+                templates = ai_service.get_prompt_templates()
+                template_options = {key: data['name'] for key, data in templates.items()}
+                
+                selected_template_key = st.selectbox(
+                    "Choose summary type:",
+                    options=list(template_options.keys()),
+                    format_func=lambda x: template_options[x],
+                    index=list(template_options.keys()).index(st.session_state.ai_summary_template),
+                    help="Select the type of summary you want to generate",
+                    key="ai_template_selector"
+                )
+                
+                # Update session state when template changes
+                if selected_template_key != st.session_state.ai_summary_template:
+                    st.session_state.ai_summary_template = selected_template_key
+                
+                # Show template description
+                template_info = templates[selected_template_key]
+                st.caption(f"📝 {template_info['description']}")
+                
+                # Generate button
+                generate_disabled = st.session_state.ai_generating
+                generate_text = "🔄 Generating..." if st.session_state.ai_generating else "✨ Generate Summary"
+                
+                if st.button(generate_text, disabled=generate_disabled, use_container_width=True, type="primary"):
+                    # Read current file content
+                    try:
+                        with open(st.session_state.selected_file, 'r', encoding='utf-8') as file:
+                            file_content = file.read()
+                        
+                        # Validate content size
+                        validation = ai_service.validate_content_size(file_content)
+                        if not validation['valid']:
+                            st.error(validation['message'])
+                        else:
+                            # Generate summary
+                            st.session_state.ai_generating = True
+                            st.rerun()
+                    
+                    except Exception as e:
+                        st.error(f"Error reading file: {str(e)}")
+                
+                # Handle the actual generation (runs when ai_generating is True)
+                if st.session_state.ai_generating:
+                    try:
+                        with open(st.session_state.selected_file, 'r', encoding='utf-8') as file:
+                            file_content = file.read()
+                        
+                        progress_bar = st.progress(0)
+                        status_text = st.empty()
+                        
+                        def progress_callback(message):
+                            status_text.text(message)
+                            progress_bar.progress(0.5)
+                        
+                        progress_callback("Generating summary...")
+                        result = ai_service.generate_summary(file_content, selected_template_key, progress_callback)
+                        
+                        progress_bar.progress(1.0)
+                        status_text.text("Summary generated!")
+                        
+                        if result['success']:
+                            st.session_state.ai_summary = result['summary']
+                            st.session_state.ai_last_template_used = result['template_name']
+                            st.session_state.ai_summary_tokens = result.get('tokens_used')
+                            st.success(f"✅ Summary generated successfully!")
+                            if result.get('tokens_used'):
+                                st.caption(f"Tokens used: {result['tokens_used']}")
+                        else:
+                            st.error(f"❌ {result['error']}")
+                        
+                        st.session_state.ai_generating = False
+                        progress_bar.empty()
+                        status_text.empty()
+                        st.rerun()
+                    
+                    except Exception as e:
+                        st.error(f"Error generating summary: {str(e)}")
+                        st.session_state.ai_generating = False
+                        st.rerun()
+                
+                # Display existing summary
+                if st.session_state.ai_summary and not st.session_state.ai_generating:
+                    st.subheader("📄 Summary")
+                    if st.session_state.ai_last_template_used:
+                        st.caption(f"Generated using: {st.session_state.ai_last_template_used}")
+                    
+                    # Summary content in an expandable container
+                    with st.expander("View Summary", expanded=True):
+                        st.markdown(st.session_state.ai_summary)
+                    
+                    # Action buttons
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        # Copy button (using st.code for easy copying)
+                        if st.button("📋 Copy Summary", use_container_width=True):
+                            st.code(st.session_state.ai_summary, language=None)
+                            st.success("Summary copied to view! Use Ctrl+A, Ctrl+C to copy.")
+                    
+                    with col2:
+                        # Download button
+                        if st.button("📥 Download Summary", use_container_width=True):
+                            filename = f"{st.session_state.get('file_name', 'document')}_summary.md"
+                            st.download_button(
+                                label="📥 Download as Markdown",
+                                data=st.session_state.ai_summary,
+                                file_name=filename,
+                                mime="text/markdown",
+                                use_container_width=True
+                            )
     
     # Main content area
     if 'selected_file' in st.session_state and os.path.exists(st.session_state.selected_file):
@@ -694,6 +836,12 @@ def main():
                                 st.session_state.original_content = ""
                                 st.session_state.has_unsaved_changes = False
                                 st.session_state.confirm_save = False
+                                
+                                # Reset AI summary state when navigating to new file
+                                st.session_state.ai_summary = ""
+                                st.session_state.ai_last_template_used = ""
+                                st.session_state.ai_summary_tokens = None
+                                st.session_state.ai_generating = False
                                 
                                 # Update the folder path to the new file's directory if needed
                                 new_dir = os.path.dirname(target_path)
