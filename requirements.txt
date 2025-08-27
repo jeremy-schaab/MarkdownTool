@@ -1,3 +1,4 @@
 streamlit
 markdown
 pygments
+streamlit-ace
