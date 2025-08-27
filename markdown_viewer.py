@@ -416,25 +416,33 @@ def main():
                     scrolling=True
                 )
                 
+                # Debug toggle in sidebar
+                show_debug = st.sidebar.checkbox("🐛 Show Debug Info", value=False, help="Show debugging information for link navigation")
+                
                 # Debug: Show component return value
-                if clicked_link:
-                    st.sidebar.write("Debug - Component returned:", clicked_link)
+                if show_debug and clicked_link:
+                    st.sidebar.write("**Debug - Component returned:**", clicked_link)
                 
                 # Handle link navigation
                 if clicked_link and isinstance(clicked_link, dict) and clicked_link.get('action') == 'navigate_to_file':
                     href = clicked_link.get('href')
                     base_dir = clicked_link.get('baseDir', '').replace('/', os.sep)
                     
-                    st.sidebar.write(f"Debug - Navigating to: {href}")
-                    st.sidebar.write(f"Debug - Base dir: {base_dir}")
+                    if show_debug:
+                        st.sidebar.write(f"**Debug - Navigating to:** {href}")
+                        st.sidebar.write(f"**Debug - Base dir:** {base_dir}")
                     
                     if href:
                         # Resolve the target file path
                         target_path = resolve_markdown_link(selected_file_path, href)
-                        st.sidebar.write(f"Debug - Resolved path: {target_path}")
+                        
+                        if show_debug:
+                            st.sidebar.write(f"**Debug - Resolved path:** {target_path}")
                         
                         if target_path and os.path.exists(target_path):
-                            st.sidebar.success(f"Debug - File found, navigating to: {target_path}")
+                            if show_debug:
+                                st.sidebar.success(f"**Debug - File found, navigating to:** {target_path}")
+                            
                             # Update session state to navigate to the new file
                             st.session_state.selected_file = target_path
                             st.session_state.file_name = os.path.basename(target_path)
