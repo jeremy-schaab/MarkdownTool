@@ -15,10 +15,11 @@ class AIService:
             'endpoint': os.getenv('AZURE_OPENAI_ENDPOINT'),
             'api_key': os.getenv('AZURE_OPENAI_API_KEY'),
             'api_version': os.getenv('AZURE_OPENAI_API_VERSION', '2024-02-15-preview'),
-            'deployment': os.getenv('AZURE_OPENAI_CHAT_DEPLOYMENT', 'gpt-4.1-mini'),
-            'max_tokens': int(os.getenv('AZURE_OPENAI_MAX_TOKENS', 4096)),
+            'deployment': os.getenv('AZURE_OPENAI_CHAT_DEPLOYMENT', 'gpt-5-mini'),
+            'max_tokens': int(os.getenv('AZURE_OPENAI_MAX_TOKENS', 128000)),
             'temperature': float(os.getenv('AZURE_OPENAI_TEMPERATURE', 0.25)),
-            'timeout': int(os.getenv('AZURE_OPENAI_REQUEST_TIMEOUT', 120))
+            'timeout': int(os.getenv('AZURE_OPENAI_REQUEST_TIMEOUT', 180)),
+            'max_context_tokens': 400000  # GPT-5 Mini context window
         }
         self._initialize_client()
     
@@ -224,21 +225,26 @@ Document content:
     def validate_content_size(self, content: str) -> Dict[str, Any]:
         """Validate that content size is appropriate for API limits"""
         estimated_tokens = self.estimate_tokens(content)
-        max_input_tokens = self.config['max_tokens'] - 500  # Reserve tokens for response
+        # Reserve tokens for system prompt, user prompt formatting, and response
+        system_prompt_tokens = 200  # Estimated tokens for system prompt
+        formatting_tokens = 300     # Estimated tokens for prompt formatting
+        response_tokens = self.config['max_tokens']  # Reserve full response capacity
+        
+        max_input_tokens = self.config['max_context_tokens'] - system_prompt_tokens - formatting_tokens - response_tokens
         
         if estimated_tokens > max_input_tokens:
             return {
                 'valid': False,
                 'estimated_tokens': estimated_tokens,
                 'max_tokens': max_input_tokens,
-                'message': f'Content is too large ({estimated_tokens} estimated tokens). Maximum allowed is {max_input_tokens} tokens.'
+                'message': f'Content is too large ({estimated_tokens:,} estimated tokens). Maximum allowed is {max_input_tokens:,} tokens.'
             }
         
         return {
             'valid': True,
             'estimated_tokens': estimated_tokens,
             'max_tokens': max_input_tokens,
-            'message': f'Content size is acceptable ({estimated_tokens} estimated tokens).'
+            'message': f'Content size is acceptable ({estimated_tokens:,} estimated tokens out of {max_input_tokens:,} max).'
         }
 
 # Global instance
