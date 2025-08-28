@@ -385,9 +385,10 @@ def render_markdown_component(html_content, selected_file_path):
 '''
     
     # Create an interactive component that can communicate back to Streamlit
+    # Increased height to prevent content cutoff at bottom
     clicked_link = components.html(
         full_html,
-        height=800,
+        height=1000,  # Increased from 800 to 1000
         scrolling=True
     )
     
@@ -421,8 +422,8 @@ def render_editor_toolbar():
 
 def main():
     st.set_page_config(
-        page_title="Markdown Viewer",
-        page_icon="📄",
+        page_title="Markdown Manager",
+        page_icon="⚡",
         layout="wide",
         initial_sidebar_state="expanded"
     )
@@ -439,15 +440,34 @@ def main():
             st.session_state.file_name = os.path.basename(nav_file)
             st.session_state.last_selected_file = nav_file
             st.session_state.last_folder_path = os.path.dirname(nav_file)
-            # Clear the query parameter
-            st.query_params.clear()
+            # Update URL to remember the folder but clear navigate_to
+            st.query_params.update({"folder": os.path.dirname(nav_file)})
+            if 'navigate_to' in st.query_params:
+                del st.query_params['navigate_to']
             st.rerun()
     
-    st.title("📄 Markdown File Viewer")
+    # Custom CSS to reduce top padding
+    st.markdown("""
+    <style>
+    .stMainBlockContainer.block-container.st-emotion-cache-zy6yx3.e4man114 {
+        padding-top: 1.25rem !important;
+    }
+    
+    /* Alternative selectors in case the class names change */
+    .stMainBlockContainer {
+        padding-top: 1.25rem !important;
+    }
+    
+    .block-container {
+        padding-top: 1.25rem !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    st.title("⚡ Markdown Manager")
     
     # Sidebar with file selection
     with st.sidebar:
-        st.header("📁 Select Markdown File")
         # File uploader for markdown files
         uploaded_file = st.file_uploader(
             "Choose a markdown file",
@@ -472,9 +492,16 @@ def main():
         if st.button("🔄 Refresh", help="Refresh file list", use_container_width=True):
             st.rerun()
         
-        # Initialize folder path in session state if not exists
+        # Initialize folder path with persistent storage using query params
+        # Check if there's a stored folder path in the URL or use current working directory
         if 'last_folder_path' not in st.session_state:
-            st.session_state.last_folder_path = os.getcwd()
+            # Try to get folder from URL parameters first
+            query_params = st.query_params
+            stored_folder = query_params.get('folder', '')
+            if stored_folder and os.path.exists(stored_folder) and os.path.isdir(stored_folder):
+                st.session_state.last_folder_path = stored_folder
+            else:
+                st.session_state.last_folder_path = os.getcwd()
             
         folder_path = st.text_input(
             "Enter folder path:",
@@ -483,9 +510,12 @@ def main():
             key="folder_path_input"
         )
         
-        # Update session state when folder path changes
+        # Update session state and URL when folder path changes
         if folder_path != st.session_state.last_folder_path:
             st.session_state.last_folder_path = folder_path
+            # Store folder path in URL for persistence across refreshes
+            if os.path.exists(folder_path) and os.path.isdir(folder_path):
+                st.query_params.update({"folder": folder_path})
         
         if os.path.exists(folder_path) and os.path.isdir(folder_path):
             # Find markdown files
