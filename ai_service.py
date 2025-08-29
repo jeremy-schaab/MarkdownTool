@@ -56,6 +56,14 @@ class AIService:
 
 Keep the summary concise (2-4 paragraphs) and accessible to a general audience.
 
+**Format Requirements:**
+- Use proper Markdown headers (# ## ###)
+- Use bullet points for lists
+- Use **bold** for emphasis on key points
+- Use *italic* for subtle emphasis
+- Ensure proper paragraph spacing
+- Structure as a complete, well-formatted Markdown document
+
 Document content:
 {content}"""
             },
@@ -71,6 +79,16 @@ Document content:
 - Relationships between different topics covered
 
 Provide a thorough analysis suitable for someone who needs to understand the full scope of the document.
+
+**Format Requirements:**
+- Use clear Markdown headers (# ## ###) to organize sections
+- Use numbered lists for sequential information
+- Use bullet points for related items
+- Use `code blocks` for technical terms or code
+- Use **bold** for important concepts
+- Use *italic* for definitions or emphasis
+- Include proper paragraph breaks and spacing
+- Structure as a professional, well-formatted Markdown document
 
 Document content:
 {content}"""
@@ -88,6 +106,16 @@ Document content:
 - Integration points and interfaces
 
 Present the analysis in a way that would be useful for software architects and technical leads.
+
+**Format Requirements:**
+- Use clear Markdown headers (# ## ###) for different architectural aspects
+- Use bullet points for component lists and features
+- Use numbered lists for processes or sequential steps
+- Use ```code blocks``` for technical specifications or code examples
+- Use **bold** for component names and important terms
+- Use *italic* for architectural patterns or concepts
+- Include diagrams descriptions in text format where helpful
+- Structure as a technical Markdown document with proper formatting
 
 Document content:
 {content}"""
@@ -107,6 +135,17 @@ Document content:
 
 Provide technical insights suitable for developers and engineers working with this system.
 
+**Format Requirements:**
+- Use clear Markdown headers (# ## ###) for different technical aspects
+- Use ```code blocks``` with language specification for all code examples
+- Use bullet points for requirements, features, and lists
+- Use numbered lists for step-by-step procedures
+- Use **bold** for important technical terms and concepts
+- Use *italic* for file names, variables, and parameters
+- Use tables for specifications and comparisons where appropriate
+- Include proper code formatting and syntax highlighting
+- Structure as a comprehensive technical Markdown document
+
 Document content:
 {content}"""
             },
@@ -125,7 +164,70 @@ Document content:
 
 Provide constructive feedback that would help improve the document or the system it describes.
 
+**Format Requirements:**
+- Use clear Markdown headers (# ## ###) to organize review sections
+- Use bullet points for strengths, weaknesses, and recommendations
+- Use numbered lists for prioritized action items or steps
+- Use **bold** for important findings and key recommendations
+- Use *italic* for document references and specific concerns
+- Use `code` formatting for specific technical issues
+- Include checkboxes (- [ ]) for actionable items
+- Structure as a professional review document with clear formatting
+
 Document content:
+{content}"""
+            },
+            "improve": {
+                "name": "Improve this Document",
+                "description": "Enhanced version with improved readability, organization, and added context",
+                "prompt": """Please analyze this markdown document and provide an improved version that enhances readability and organization. Your improvements should:
+
+**Structure & Organization:**
+- Reorganize content for better logical flow
+- Add or improve section headers and subheaders
+- Create clear hierarchies and groupings
+- Add table of contents if beneficial
+
+**Readability Enhancements:**
+- Improve clarity of explanations
+- Break up dense paragraphs into digestible chunks
+- Add bullet points and numbered lists where appropriate
+- Enhance formatting for better visual appeal
+
+**Content Enrichment:**
+- Add contextual information where helpful
+- Include brief explanations for technical terms
+- Add introductory paragraphs to sections when needed
+- Suggest examples or use cases where relevant
+- Add cross-references between related sections
+
+**Quality Improvements:**
+- Fix any formatting inconsistencies
+- Ensure consistent terminology throughout
+- Improve transitions between sections
+- Add summary points where beneficial
+
+**Important Guidelines:**
+- DO NOT remove any existing content
+- DO NOT change the core meaning or intent
+- DO NOT add information that isn't supported by the original content
+- Focus on making the existing information clearer and more accessible
+- Preserve all original technical details and specifications
+
+**Markdown Formatting Requirements:**
+- Use proper Markdown headers (# ## ### ####) for clear hierarchy
+- Use bullet points and numbered lists appropriately
+- Use **bold** for important terms and concepts
+- Use *italic* for emphasis and definitions
+- Use `code` blocks for technical terms, file names, and code
+- Use tables for structured information
+- Include proper line spacing and paragraph breaks
+- Add table of contents using Markdown links if beneficial
+- Ensure all formatting follows Markdown best practices
+
+Please provide the complete improved document as a well-formatted Markdown file with clear explanations of major changes made.
+
+Original document content:
 {content}"""
             }
         }
@@ -187,21 +289,19 @@ Document content:
                 if progress_callback:
                     progress_callback(f"Attempt {attempt + 1} of {max_retries}...")
                 
+                # Use only parameters supported by the model
                 response = self.client.chat.completions.create(
                     model=self.config['deployment'],
                     messages=[
                         {
                             "role": "system",
-                            "content": "You are a helpful AI assistant that analyzes and summarizes markdown documents. Provide clear, well-structured responses based on the content provided."
+                            "content": "You are a helpful AI assistant that analyzes and summarizes markdown documents. ALWAYS format your responses using proper Markdown syntax including headers (# ## ###), bullet points, numbered lists, code blocks (```), emphasis (*italic*, **bold**), and proper line spacing. Ensure your output is a well-structured, properly formatted Markdown document that will render beautifully."
                         },
                         {
                             "role": "user", 
                             "content": prompt
                         }
-                    ],
-                    max_tokens=self.config['max_tokens'],
-                    temperature=self.config['temperature'],
-                    timeout=self.config['timeout']
+                    ]
                 )
                 
                 return response

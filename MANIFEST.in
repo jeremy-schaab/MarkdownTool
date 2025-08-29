@@ -1,0 +1,10 @@
+include README.md
+include INSTALL.md
+include CLAUDE.md
+include requirements.txt
+include .env.example
+include run_app.bat
+include install.bat
+include install.ps1
+recursive-include docs *.md
+recursive-include test_files *.md
