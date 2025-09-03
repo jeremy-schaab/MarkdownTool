@@ -699,6 +699,53 @@ def render_markdown_component(html_content, selected_file_path):
     
     return clicked_link
 
+def build_printable_html_document(html_content: str, title: str = "Document") -> str:
+    """Build a standalone HTML page with Mermaid and print styles.
+
+    The page auto-renders Mermaid and triggers the browser print dialog.
+    """
+    full = f"""<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset=\"utf-8\" />
+    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />
+    <title>{title}</title>
+    <style>
+      body {{ margin: 16px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #333; }}
+      .markdown-content {{ line-height: 1.6; font-size: 16px; }}
+      .markdown-content h1, .markdown-content h2, .markdown-content h3 {{ margin-top: 1.5em; margin-bottom: 0.5em; color: #1f2937; }}
+      .markdown-content pre {{ background-color: #f8f9fa; border: 1px solid #e9ecef; border-radius: 4px; padding: 1rem; overflow-x: auto; margin: 1em 0; }}
+      .markdown-content code {{ background-color: #f8f9fa; padding: 0.2em 0.4em; border-radius: 3px; font-size: 0.9em; font-family: 'Monaco', 'Consolas', 'Courier New', monospace; }}
+      .markdown-content pre code {{ background: transparent; padding: 0; }}
+      .markdown-content table {{ border-collapse: collapse; width: 100%; margin: 1em 0; }}
+      .markdown-content th, .markdown-content td {{ border: 1px solid #ddd; padding: 8px 12px; text-align: left; }}
+      .markdown-content th {{ background-color: #f2f2f2; font-weight: bold; }}
+      @media print {{
+        @page {{ margin: 16mm; }}
+        body {{ background: #fff; }}
+        a[href^=\"http\"]::after {{ content: \" (\" attr(href) \")\"; font-size: 0.85em; color: #666; }}
+        .no-print {{ display: none !important; }}
+        svg {{ break-inside: avoid; }}
+        pre, code, table, .mermaid {{ break-inside: avoid; }}
+      }}
+    </style>
+    <script src=\"https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js\"></script>
+    <script>
+      if (window.mermaid) {{
+        try {{ mermaid.initialize({{ startOnLoad: true, securityLevel: 'loose' }}); }} catch (e) {{ console.error('Mermaid init error', e); }}
+      }}
+      window.addEventListener('load', function() {{
+        try {{ if (window.mermaid) {{ mermaid.init(undefined, document.querySelectorAll('.mermaid')); }} }} catch (e) {{}}
+        setTimeout(function() {{ window.print(); }}, 800);
+      }});
+    </script>
+  </head>
+  <body>
+    <div class=\"markdown-content\">{html_content}</div>
+  </body>
+ </html>"""
+    return full
+
 def render_editor_toolbar():
     """Render the editor toolbar with formatting buttons"""
     col1, col2, col3, col4, col5, col6, col7 = st.columns([1, 1, 1, 1, 1, 1, 2])
@@ -911,6 +958,39 @@ def main():
                     except Exception as e:
                         st.error(f"❌ Error exporting to PDF: {str(e)}")
             
+            # Print to PDF via browser using a clean, standalone HTML
+            if 'selected_file' in st.session_state and st.session_state.selected_file and not st.session_state.edit_mode:
+                col_print1, col_print2 = st.columns(2)
+                with col_print1:
+                    if st.button("🖨️ Print to PDF (Browser)", use_container_width=True, type="secondary"):
+                        try:
+                            with open(st.session_state.selected_file, 'r', encoding='utf-8') as f:
+                                content = f.read()
+                            base_name = os.path.splitext(os.path.basename(st.session_state.selected_file))[0]
+                            html_content = render_markdown(content)
+                            full_html = build_printable_html_document(html_content, title=base_name)
+                            import streamlit.components.v1 as components
+                            components.html(full_html, height=900, scrolling=True)
+                            st.info("Browser print dialog should appear; choose 'Save as PDF'.")
+                        except Exception as e:
+                            st.error(f"Error preparing print view: {str(e)}")
+                with col_print2:
+                    try:
+                        with open(st.session_state.selected_file, 'r', encoding='utf-8') as f:
+                            content_for_dl = f.read()
+                        base_name = os.path.splitext(os.path.basename(st.session_state.selected_file))[0]
+                        html_content_for_dl = render_markdown(content_for_dl)
+                        full_html_dl = build_printable_html_document(html_content_for_dl, title=base_name)
+                        st.download_button(
+                            label="⬇️ Download Print-Ready HTML",
+                            data=full_html_dl.encode('utf-8'),
+                            file_name=f"{base_name}.print.html",
+                            mime="text/html",
+                            use_container_width=True
+                        )
+                    except Exception as e:
+                        st.error(f"Error preparing HTML download: {str(e)}")
+
             # Layout options (only show in edit mode)
             if st.session_state.edit_mode:
                 st.session_state.editor_layout = st.radio(
