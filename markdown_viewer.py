@@ -8,6 +8,15 @@ import base64
 import tempfile
 import time
 from ai_service import ai_service
+import markdown2
+from reportlab.lib.pagesizes import letter, A4
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, Preformatted
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.lib import colors
+from reportlab.lib.enums import TA_LEFT, TA_CENTER
+import re
+from html.parser import HTMLParser
 
 def find_markdown_files(directory):
     """Recursively find all markdown files in a directory"""
@@ -96,6 +105,156 @@ def render_markdown(content):
         }
     )
     return md.convert(content)
+
+class MarkdownToPDFConverter:
+    """Convert markdown to PDF using ReportLab"""
+    
+    def __init__(self):
+        self.styles = getSampleStyleSheet()
+        self._setup_styles()
+        
+    def _setup_styles(self):
+        """Setup custom styles for markdown elements"""
+        # Heading styles
+        self.styles.add(ParagraphStyle(
+            name='CustomH1',
+            parent=self.styles['Heading1'],
+            fontSize=24,
+            textColor=colors.HexColor('#2c3e50'),
+            spaceAfter=12,
+            spaceBefore=12
+        ))
+        
+        self.styles.add(ParagraphStyle(
+            name='CustomH2',
+            parent=self.styles['Heading2'],
+            fontSize=18,
+            textColor=colors.HexColor('#34495e'),
+            spaceAfter=10,
+            spaceBefore=10
+        ))
+        
+        self.styles.add(ParagraphStyle(
+            name='CustomH3',
+            parent=self.styles['Heading3'],
+            fontSize=14,
+            textColor=colors.HexColor('#34495e'),
+            spaceAfter=8,
+            spaceBefore=8
+        ))
+        
+        # Code block style
+        self.styles.add(ParagraphStyle(
+            name='CodeBlock',
+            parent=self.styles['Code'],
+            fontSize=9,
+            fontName='Courier',
+            backgroundColor=colors.HexColor('#f6f8fa'),
+            leftIndent=10,
+            rightIndent=10,
+            spaceAfter=10,
+            spaceBefore=10
+        ))
+        
+        # Regular paragraph
+        self.styles.add(ParagraphStyle(
+            name='CustomBody',
+            parent=self.styles['BodyText'],
+            fontSize=11,
+            leading=14,
+            textColor=colors.HexColor('#333333'),
+            spaceAfter=8
+        ))
+
+    def markdown_to_pdf_elements(self, markdown_text):
+        """Convert markdown text to ReportLab elements"""
+        elements = []
+        
+        # Split by lines for processing
+        lines = markdown_text.split('\n')
+        i = 0
+        
+        while i < len(lines):
+            line = lines[i]
+            
+            # Headers
+            if line.startswith('### '):
+                elements.append(Paragraph(line[4:], self.styles['CustomH3']))
+                elements.append(Spacer(1, 0.1*inch))
+            elif line.startswith('## '):
+                elements.append(Paragraph(line[3:], self.styles['CustomH2']))
+                elements.append(Spacer(1, 0.15*inch))
+            elif line.startswith('# '):
+                elements.append(Paragraph(line[2:], self.styles['CustomH1']))
+                elements.append(Spacer(1, 0.2*inch))
+            
+            # Code blocks
+            elif line.startswith('```'):
+                code_lines = []
+                i += 1
+                while i < len(lines) and not lines[i].startswith('```'):
+                    code_lines.append(lines[i])
+                    i += 1
+                if code_lines:
+                    code_text = '\n'.join(code_lines)
+                    # Use Preformatted for code blocks
+                    elements.append(Preformatted(code_text, self.styles['CodeBlock']))
+                    elements.append(Spacer(1, 0.1*inch))
+            
+            # Bullet points
+            elif line.strip().startswith('- ') or line.strip().startswith('* '):
+                bullet_text = line.strip()[2:]
+                elements.append(Paragraph(f"• {bullet_text}", self.styles['CustomBody']))
+            
+            # Numbered lists
+            elif re.match(r'^\d+\.\s', line.strip()):
+                elements.append(Paragraph(line.strip(), self.styles['CustomBody']))
+            
+            # Regular paragraphs
+            elif line.strip():
+                # Handle inline code
+                line = re.sub(r'`([^`]+)`', r'<font name="Courier">\1</font>', line)
+                # Handle bold
+                line = re.sub(r'\*\*([^*]+)\*\*', r'<b>\1</b>', line)
+                line = re.sub(r'__([^_]+)__', r'<b>\1</b>', line)
+                # Handle italic
+                line = re.sub(r'\*([^*]+)\*', r'<i>\1</i>', line)
+                line = re.sub(r'_([^_]+)_', r'<i>\1</i>', line)
+                
+                elements.append(Paragraph(line, self.styles['CustomBody']))
+            
+            # Empty lines
+            elif not line.strip():
+                elements.append(Spacer(1, 0.1*inch))
+            
+            i += 1
+        
+        return elements
+
+def export_to_pdf(markdown_content, output_filename):
+    """Export markdown content to PDF using ReportLab"""
+    try:
+        # Create PDF document
+        doc = SimpleDocTemplate(
+            output_filename,
+            pagesize=A4,
+            rightMargin=72,
+            leftMargin=72,
+            topMargin=72,
+            bottomMargin=72
+        )
+        
+        # Convert markdown to PDF elements
+        converter = MarkdownToPDFConverter()
+        elements = converter.markdown_to_pdf_elements(markdown_content)
+        
+        # Build PDF
+        doc.build(elements)
+        return True
+        
+    except Exception as e:
+        st.error(f"Error generating PDF: {str(e)}")
+        return False
 
 def resolve_markdown_link(current_file_path, link_href):
     """Resolve a markdown link relative to the current file"""
@@ -527,7 +686,6 @@ def main():
         
         if uploaded_file is not None:
             # Save uploaded file temporarily and display it
-            import tempfile
             with tempfile.NamedTemporaryFile(mode='w+', suffix='.md', delete=False) as tmp_file:
                 content = uploaded_file.getvalue().decode('utf-8')
                 tmp_file.write(content)
@@ -619,6 +777,43 @@ def main():
                     st.warning("⚠️ You have unsaved changes! Please save or they will be lost.")
                 toggle_edit_mode()
                 st.rerun()
+            
+            # Export to PDF button (only show when viewing a file)
+            if 'selected_file' in st.session_state and st.session_state.selected_file and not st.session_state.edit_mode:
+                if st.button("📄 Export to PDF", use_container_width=True, type="secondary"):
+                    try:
+                        # Read the markdown file content
+                        with open(st.session_state.selected_file, 'r', encoding='utf-8') as f:
+                            content = f.read()
+                        
+                        # Generate PDF filename based on markdown filename
+                        base_name = os.path.splitext(os.path.basename(st.session_state.selected_file))[0]
+                        pdf_filename = f"{base_name}.pdf"
+                        
+                        # Create a temporary file for the PDF
+                        with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp_file:
+                            tmp_filename = tmp_file.name
+                        
+                        # Export to PDF
+                        if export_to_pdf(content, tmp_filename):
+                            # Read the PDF file
+                            with open(tmp_filename, 'rb') as pdf_file:
+                                pdf_data = pdf_file.read()
+                            
+                            # Clean up temp file
+                            os.unlink(tmp_filename)
+                            
+                            # Offer download
+                            st.download_button(
+                                label="⬇️ Download PDF",
+                                data=pdf_data,
+                                file_name=pdf_filename,
+                                mime="application/pdf",
+                                use_container_width=True
+                            )
+                            st.success(f"✅ PDF generated successfully!")
+                    except Exception as e:
+                        st.error(f"❌ Error exporting to PDF: {str(e)}")
             
             # Layout options (only show in edit mode)
             if st.session_state.edit_mode:

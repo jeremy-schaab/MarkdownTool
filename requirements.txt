@@ -4,3 +4,5 @@ pygments
 streamlit-ace
 openai
 python-dotenv
+reportlab
+markdown2
