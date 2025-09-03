@@ -83,8 +83,85 @@ def _render_file_tree_v2(tree: dict, selected_full_path: str | None = None, base
             clicked = full_path
     return clicked
 
+def _preprocess_mermaid(md_text: str) -> str:
+    """Convert mermaid code fences or graph TB blocks into raw mermaid divs.
+
+    Supports:
+    - ```mermaid ... ```
+    - ``` (first non-empty line starts with graph/flowchart)
+    """
+    lines = md_text.split("\n")
+    out = []
+    i = 0
+    in_fence = False
+    fence_lang = None
+    buf = []
+
+    def is_mermaid_block(text_block: list[str]) -> bool:
+        # Find first non-empty content line
+        for t in text_block:
+            s = t.strip()
+            if not s:
+                continue
+            # Mermaid flowchart keywords
+            if s.lower().startswith("graph "):
+                return True
+            if s.lower().startswith("flowchart "):
+                return True
+            return False
+        return False
+
+    while i < len(lines):
+        line = lines[i]
+        if not in_fence:
+            if line.startswith("```"):
+                in_fence = True
+                fence_lang = line.strip().lstrip("`").strip()  # capture language after ```
+                buf = []
+            else:
+                out.append(line)
+        else:
+            # inside fence
+            if line.startswith("```"):
+                # fence end
+                content_lines = buf
+                is_mermaid = (fence_lang.lower() == "mermaid") if fence_lang else False
+                if not is_mermaid:
+                    # Detect graph TB/TD/LR/RL or flowchart
+                    is_mermaid = is_mermaid_block(content_lines)
+
+                if is_mermaid:
+                    out.append("<div class=\"mermaid\">")
+                    out.extend(content_lines)
+                    out.append("</div>")
+                else:
+                    # restore original fenced block
+                    fence_header = "```" + (fence_lang if fence_lang else "")
+                    out.append(fence_header)
+                    out.extend(content_lines)
+                    out.append("```")
+
+                in_fence = False
+                fence_lang = None
+                buf = []
+            else:
+                buf.append(line)
+        i += 1
+
+    # If file ends while still in fence, just flush as original
+    if in_fence:
+        fence_header = "```" + (fence_lang if fence_lang else "")
+        out.append(fence_header)
+        out.extend(buf)
+        # Do not append closing fence; keep as-is for visibility
+
+    return "\n".join(out)
+
 def render_markdown(content):
-    """Render markdown content with extensions for better formatting"""
+    """Render markdown content with extensions for better formatting, incl. Mermaid."""
+    # Preprocess to convert Mermaid fences to raw HTML divs so Markdown won't escape them
+    content = _preprocess_mermaid(content)
+
     md = markdown.Markdown(
         extensions=[
             'markdown.extensions.codehilite',
@@ -496,6 +573,17 @@ def render_markdown_component(html_content, selected_file_path):
         .highlight .gu {{ color: #6f42c1; font-weight: bold; }} /* Generic subheading */
         .highlight .w {{ color: #24292e; }} /* Whitespace */
     </style>
+    <!-- Mermaid JS for diagrams -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script>
+        if (window.mermaid) {{
+            try {{
+                mermaid.initialize({{ startOnLoad: true, securityLevel: 'loose' }});
+            }} catch (e) {{
+                console.error('Mermaid init error', e);
+            }}
+        }}
+    </script>
     <script>
         // Debug function to log messages
         function debugLog(message) {{
@@ -504,6 +592,14 @@ def render_markdown_component(html_content, selected_file_path):
 
         document.addEventListener('DOMContentLoaded', function() {{
             debugLog('DOM loaded, setting up link listeners');
+            // Initialize Mermaid on load (in case dynamic content)
+            try {{
+                if (window.mermaid) {{
+                    mermaid.init(undefined, document.querySelectorAll('.mermaid'));
+                }}
+            }} catch (e) {{
+                console.error('Mermaid run error', e);
+            }}
             
             // Intercept clicks on links
             document.addEventListener('click', function(e) {{
@@ -566,7 +662,7 @@ def render_markdown_component(html_content, selected_file_path):
                                         targetPath = '{base_dir.replace(os.sep, "/").replace(os.sep, "/")}/' + href;
                                     }}
                                     
-                                    // Navigate using URL parameters
+                            // Navigate using URL parameters
                                     const currentUrl = new URL(window.parent.location);
                                     currentUrl.searchParams.set('navigate_to', targetPath.replace(/\\//g, '\\\\\\\\'));
                                     window.parent.location.href = currentUrl.toString();
@@ -1118,7 +1214,8 @@ def main():
                         with col2:
                             st.subheader("👁️ Live Preview")
                             preview_content = render_markdown(st.session_state.editor_content)
-                            st.markdown(preview_content, unsafe_allow_html=True)
+                            # Use the HTML component so Mermaid and link handling work in preview
+                            _ = render_markdown_component(preview_content, selected_file_path)
                     
                     elif st.session_state.editor_layout == "tabbed":
                         # Show tabs for editor and preview
@@ -1146,7 +1243,7 @@ def main():
                         
                         with tab2:
                             preview_content = render_markdown(st.session_state.editor_content)
-                            st.markdown(preview_content, unsafe_allow_html=True)
+                            _ = render_markdown_component(preview_content, selected_file_path)
                 
                 else:
                     # View mode - show rendered markdown with AI summary layouts
