@@ -24,6 +24,56 @@ def find_markdown_files(directory):
     
     return sorted(markdown_files)
 
+def _build_file_tree(markdown_files):
+    """Build a nested dict tree from a list of (rel_path, full_path)."""
+    tree = {}
+    for rel_path, full_path in markdown_files:
+        parts = Path(rel_path).parts
+        node = tree
+        for part in parts[:-1]:
+            node = node.setdefault(part, {})
+        node.setdefault('__files__', []).append((parts[-1], full_path))
+    return tree
+
+def _render_file_tree(tree: dict, selected_full_path: str | None = None, base: str = ""):
+    """Render a nested file tree with expanders and return clicked file path if any."""
+    clicked = None
+    # Render directories first
+    for dirname in sorted([k for k in tree.keys() if k != '__files__'], key=lambda s: s.lower()):
+        with st.expander(f"📁 {dirname}", expanded=False, key=f"dir:{base}{dirname}"):
+            child_clicked = _render_file_tree(tree[dirname], selected_full_path, base=f"{base}{dirname}/")
+            if child_clicked:
+                clicked = child_clicked
+    # Render files at this level
+    for fname, full_path in sorted(tree.get('__files__', []), key=lambda x: x[0].lower()):
+        is_selected = (selected_full_path == full_path)
+        button_type = "primary" if is_selected else "secondary"
+        if st.button(f"📄 {fname}", key=f"file:{full_path}", use_container_width=True, type=button_type):
+            clicked = full_path
+    return clicked
+
+def _render_file_tree_v2(tree: dict, selected_full_path: str | None = None, base: str = ""):
+    """Render a nested file tree using expanders (no key arg for compatibility).
+
+    Uses unique labels that include the subpath to avoid collisions.
+    Returns the clicked file path if any.
+    """
+    clicked = None
+    # Render directories first
+    for dirname in sorted([k for k in tree.keys() if k != '__files__'], key=lambda s: s.lower()):
+        label = f"📁 {dirname} [{base}{dirname}]" if base else f"📁 {dirname}"
+        with st.expander(label, expanded=False):
+            child_clicked = _render_file_tree_v2(tree[dirname], selected_full_path, base=f"{base}{dirname}/")
+            if child_clicked:
+                clicked = child_clicked
+    # Render files at this level
+    for fname, full_path in sorted(tree.get('__files__', []), key=lambda x: x[0].lower()):
+        is_selected = (selected_full_path == full_path)
+        button_type = "primary" if is_selected else "secondary"
+        if st.button(f"📄 {fname}", key=f"file:{full_path}", use_container_width=True, type=button_type):
+            clicked = full_path
+    return clicked
+
 def render_markdown(content):
     """Render markdown content with extensions for better formatting"""
     md = markdown.Markdown(
@@ -524,22 +574,16 @@ def main():
             if markdown_files:
                 st.write(f"📄 Found {len(markdown_files)} files:")
                 
-                selected_file = None
-                for rel_path, full_path in markdown_files:
-                    # Highlight the currently selected file
-                    is_selected = ('selected_file' in st.session_state and 
-                                 st.session_state.selected_file == full_path)
-                    button_type = "primary" if is_selected else "secondary"
-                    
-                    if st.button(
-                        rel_path, 
-                        key=full_path, 
-                        use_container_width=True,
-                        type=button_type
-                    ):
-                        selected_file = full_path
-                        st.session_state.file_name = os.path.basename(full_path)
-                        st.session_state.last_selected_file = full_path  # Remember for refresh
+                # Tree view instead of flat list
+                file_tree = _build_file_tree(markdown_files)
+                selected_file = _render_file_tree_v2(
+                    file_tree,
+                    selected_full_path=st.session_state.get('selected_file'),
+                    base=""
+                )
+                if selected_file:
+                    st.session_state.file_name = os.path.basename(selected_file)
+                    st.session_state.last_selected_file = selected_file  # Remember for refresh
                 
                 # Store selected file in session state
                 if selected_file:
@@ -992,7 +1036,7 @@ def main():
                         # Default layout (sidebar or no summary)
                         # Display the rendered markdown using HTML component
                         clicked_link = render_markdown_component(html_content, selected_file_path)
-                    
+
                     # Debug toggle in sidebar
                     show_debug = st.sidebar.checkbox("🐛 Show Debug Info", value=False, help="Show debugging information for link navigation")
                     
