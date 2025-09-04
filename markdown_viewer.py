@@ -366,6 +366,8 @@ def initialize_session_state():
         st.session_state.original_content = ""
     if 'confirm_save' not in st.session_state:
         st.session_state.confirm_save = False
+    if 'confirm_delete' not in st.session_state:
+        st.session_state.confirm_delete = False
     
     # AI summarization session state
     if 'ai_summary' not in st.session_state:
@@ -579,6 +581,8 @@ def render_markdown_component(html_content, selected_file_path):
         .highlight .gs {{ font-weight: bold; }} /* Generic strong */
         .highlight .gu {{ color: #6f42c1; font-weight: bold; }} /* Generic subheading */
         .highlight .w {{ color: #24292e; }} /* Whitespace */
+        /* Ensure the content area aims to fill viewport minus 200px */
+        .markdown-content {{ min-height: calc(100vh - 200px); }}
     </style>
     <!-- Mermaid JS for diagrams -->
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
@@ -599,6 +603,37 @@ def render_markdown_component(html_content, selected_file_path):
 
         document.addEventListener('DOMContentLoaded', function() {{
             debugLog('DOM loaded, setting up link listeners');
+            // Resize iframe so bottom gap is <= 200px
+            function setDesiredHeight() {{
+                try {{
+                    const contentH = Math.max(
+                        document.documentElement.scrollHeight,
+                        document.body ? document.body.scrollHeight : 0
+                    );
+                    const desired = Math.max(500, Math.max(contentH + 16, window.innerHeight - 200));
+                    if (window.frameElement) {{
+                        window.frameElement.style.height = desired + 'px';
+                        debugLog('Resized via frameElement to ' + desired);
+                    }} else if (window.Streamlit && typeof window.Streamlit.setFrameHeight === 'function') {{
+                        window.Streamlit.setFrameHeight(desired);
+                        debugLog('Resized via Streamlit.setFrameHeight to ' + desired);
+                    }} else {{
+                        window.parent.postMessage({{ type: 'streamlit:setFrameHeight', height: desired }}, '*');
+                        debugLog('Requested resize via postMessage to ' + desired);
+                    }}
+                }} catch (e) {{
+                    console.warn('Failed to request resize', e);
+                }}
+            }}
+            setDesiredHeight();
+            window.addEventListener('resize', setDesiredHeight);
+            // Observe DOM changes (e.g., Mermaid render) and adjust
+            try {{
+                const mo = new MutationObserver(function() {{ setDesiredHeight(); }});
+                mo.observe(document.body, {{ childList: true, subtree: true, attributes: true }});
+                setTimeout(setDesiredHeight, 400);
+                setTimeout(setDesiredHeight, 900);
+            }} catch (e) {{}}
             // Initialize Mermaid on load (in case dynamic content)
             try {{
                 if (window.mermaid) {{
@@ -700,7 +735,7 @@ def render_markdown_component(html_content, selected_file_path):
     # Increased height to prevent content cutoff at bottom
     clicked_link = components.html(
         full_html,
-        height=1000,  # Increased from 800 to 1000
+        height=700,  # JS adjusts to viewport - 200px
         scrolling=True
     )
     
@@ -808,18 +843,20 @@ def main():
     # Custom CSS to reduce top padding
     st.markdown("""
     <style>
+    /* Reduce top and bottom padding of main content area */
     .stMainBlockContainer.block-container.st-emotion-cache-zy6yx3.e4man114 {
-        padding-top: 1.25rem !important;
+        padding-top: 1.0rem !important;
+        padding-bottom: 0.75rem !important;
     }
     
     /* Alternative selectors in case the class names change */
-    .stMainBlockContainer {
-        padding-top: 1.25rem !important;
+    .stMainBlockContainer, .block-container {
+        padding-top: 1.0rem !important;
+        padding-bottom: 0.75rem !important;
     }
     
-    .block-container {
-        padding-top: 1.25rem !important;
-    }
+    /* Ensure app body can extend closer to viewport bottom */
+    main .block-container { min-height: calc(100vh - 200px); }
     </style>
     """, unsafe_allow_html=True)
     
@@ -920,16 +957,152 @@ def main():
             st.divider()
             st.subheader("✏️ Editor Controls")
             
+            # Unified action buttons: Edit, Export, Print, Download, Delete
+            selected_file = st.session_state.get('selected_file')
+            file_selected = bool(selected_file and os.path.isfile(selected_file))
+            unsaved = check_unsaved_changes()
+            c1, c2, c3, c4, c5 = st.columns(5)
+            with c1:
+                edit_label = "✅ Exit Edit" if st.session_state.edit_mode else "✏️ Edit"
+                if st.button(edit_label, use_container_width=True, type="primary" if st.session_state.edit_mode else "secondary"):
+                    if st.session_state.edit_mode and unsaved:
+                        st.warning("You have unsaved changes! Overwrite or Download first.")
+                    toggle_edit_mode()
+                    st.rerun()
+            with c2:
+                if st.button("📄 Export", use_container_width=True, type="secondary", disabled=not file_selected):
+                    try:
+                        if st.session_state.edit_mode and st.session_state.editor_content:
+                            content = st.session_state.editor_content
+                            base_name = os.path.splitext(st.session_state.get('file_name', 'document'))[0]
+                        else:
+                            with open(selected_file, 'r', encoding='utf-8') as f:
+                                content = f.read()
+                            base_name = os.path.splitext(os.path.basename(selected_file))[0]
+                        pdf_filename = f"{base_name}.pdf"
+                        with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp_file:
+                            tmp_filename = tmp_file.name
+                        if export_to_pdf(content, tmp_filename):
+                            with open(tmp_filename, 'rb') as pdf_file:
+                                pdf_data = pdf_file.read()
+                            os.unlink(tmp_filename)
+                            st.download_button(label="⬇️ Download PDF", data=pdf_data, file_name=pdf_filename, mime="application/pdf", use_container_width=True)
+                            st.success("PDF ready.")
+                    except Exception as e:
+                        st.error(f"Error exporting to PDF: {str(e)}")
+            with c3:
+                if st.button("🖨️ Print", use_container_width=True, type="secondary", disabled=not file_selected):
+                    try:
+                        if st.session_state.edit_mode and st.session_state.editor_content:
+                            content = st.session_state.editor_content
+                            base_name = os.path.splitext(st.session_state.get('file_name', 'document'))[0]
+                        else:
+                            with open(selected_file, 'r', encoding='utf-8') as f:
+                                content = f.read()
+                            base_name = os.path.splitext(os.path.basename(selected_file))[0]
+                        html_content = render_markdown(content)
+                        full_html = build_printable_html_document(html_content, title=base_name)
+                        import streamlit.components.v1 as components
+                        components.html(full_html, height=900, scrolling=True)
+                        st.info("Use browser dialog to Save as PDF.")
+                    except Exception as e:
+                        st.error(f"Error preparing print view: {str(e)}")
+            with c4:
+                if file_selected:
+                    if st.session_state.edit_mode and st.session_state.editor_content:
+                        data = st.session_state.editor_content
+                        filename = st.session_state.get('file_name', 'edited_file.md')
+                    else:
+                        with open(selected_file, 'r', encoding='utf-8') as f:
+                            data = f.read()
+                        filename = os.path.basename(selected_file)
+                    st.download_button(label="⬇️ Download", data=data, file_name=filename, mime="text/markdown", use_container_width=True)
+                else:
+                    st.button("⬇️ Download", use_container_width=True, disabled=True)
+            with c5:
+                if st.button("🗑️ Delete", use_container_width=True, type="secondary", disabled=not file_selected):
+                    st.session_state.confirm_delete = True
+                    st.rerun()
+
+            # Overwrite when editing
+            if file_selected and st.session_state.edit_mode and unsaved:
+                if not st.session_state.get('confirm_save', False):
+                    if st.button("💾 Overwrite", use_container_width=True, type="secondary"):
+                        st.session_state.confirm_save = True
+                        st.rerun()
+
+            # Common confirmations for Overwrite and Delete
+            if st.session_state.get('confirm_save', False):
+                file_path = st.session_state.get('selected_file', '')
+                is_temp_file = file_path.endswith('.tmp') or 'temp' in file_path.lower()
+                st.warning("This will overwrite the original file. Are you sure?")
+                col_yes, col_no = st.columns(2)
+                with col_yes:
+                    if st.button("✅ Yes, Overwrite", use_container_width=True, disabled=is_temp_file):
+                        if is_temp_file:
+                            st.error("Cannot overwrite temporary uploaded files. Use Download instead.")
+                        else:
+                            success, message = save_file_directly(file_path, st.session_state.editor_content)
+                            if success:
+                                st.success(message)
+                                st.session_state.original_content = st.session_state.editor_content
+                                st.session_state.confirm_save = False
+                                st.rerun()
+                            else:
+                                st.error(message)
+                                st.session_state.confirm_save = False
+                with col_no:
+                    if st.button("❌ Cancel", use_container_width=True):
+                        st.session_state.confirm_save = False
+                        st.rerun()
+
+            if st.session_state.get('confirm_delete', False):
+                file_path = st.session_state.get('selected_file', '')
+                st.warning("This will permanently delete the selected file. Are you sure?")
+                col_yes, col_no = st.columns(2)
+                with col_yes:
+                    if st.button("✅ Yes, Delete", use_container_width=True):
+                        try:
+                            if file_path and os.path.isfile(file_path):
+                                os.remove(file_path)
+                                st.session_state.selected_file = None
+                                st.session_state.file_name = ""
+                                st.session_state.last_selected_file = None
+                                st.session_state.edit_mode = False
+                                st.session_state.editor_content = ""
+                                st.session_state.original_content = ""
+                                st.session_state.has_unsaved_changes = False
+                                st.session_state.confirm_save = False
+                                st.session_state.confirm_delete = False
+                                st.session_state.ai_summary = ""
+                                st.session_state.ai_last_template_used = ""
+                                st.session_state.ai_summary_tokens = None
+                                st.session_state.ai_generating = False
+                                st.success("File deleted.")
+                                st.rerun()
+                            else:
+                                st.error("Selected file not found or is not a file.")
+                                st.session_state.confirm_delete = False
+                        except Exception as e:
+                            st.error(f"Error deleting file: {str(e)}")
+                            st.session_state.confirm_delete = False
+                with col_no:
+                    if st.button("❌ Cancel", use_container_width=True):
+                        st.session_state.confirm_delete = False
+                        st.rerun()
+
+            # Old controls below will be removed in cleanup
+            
             # Edit mode toggle
             edit_btn_text = "📝 Exit Edit Mode" if st.session_state.edit_mode else "✏️ Edit File"
-            if st.button(edit_btn_text, use_container_width=True, type="primary" if st.session_state.edit_mode else "secondary"):
+            if False and st.button(edit_btn_text, use_container_width=True, type="primary" if st.session_state.edit_mode else "secondary"):
                 if st.session_state.edit_mode and check_unsaved_changes():
                     st.warning("⚠️ You have unsaved changes! Please save or they will be lost.")
                 toggle_edit_mode()
                 st.rerun()
             
             # Export to PDF button (only show when viewing a file)
-            if 'selected_file' in st.session_state and st.session_state.selected_file and not st.session_state.edit_mode:
+            if False and 'selected_file' in st.session_state and st.session_state.selected_file and not st.session_state.edit_mode:
                 if st.button("📄 Export to PDF", use_container_width=True, type="secondary"):
                     try:
                         # Read the markdown file content
@@ -966,7 +1139,7 @@ def main():
                         st.error(f"❌ Error exporting to PDF: {str(e)}")
             
             # Print to PDF via browser using a clean, standalone HTML
-            if 'selected_file' in st.session_state and st.session_state.selected_file and not st.session_state.edit_mode:
+            if False and 'selected_file' in st.session_state and st.session_state.selected_file and not st.session_state.edit_mode:
                 col_print1, col_print2 = st.columns(2)
                 with col_print1:
                     if st.button("🖨️ Print to PDF (Browser)", use_container_width=True, type="secondary"):
@@ -998,6 +1171,57 @@ def main():
                     except Exception as e:
                         st.error(f"Error preparing HTML download: {str(e)}")
 
+            # File delete with confirmation
+            if False and 'selected_file' in st.session_state and st.session_state.selected_file and not st.session_state.edit_mode:
+                st.divider()
+                st.subheader("🗑️ File Operations")
+                file_path = st.session_state.get('selected_file', '')
+                if not st.session_state.confirm_delete:
+                    if st.button(
+                        "🗑️ Delete File",
+                        use_container_width=True,
+                        type="secondary",
+                        disabled=not (file_path and os.path.isfile(file_path)),
+                        help="Permanently delete this file from disk"
+                    ):
+                        st.session_state.confirm_delete = True
+                        st.rerun()
+                else:
+                    st.warning("This will permanently delete the selected file. Are you sure?")
+                    col_yes, col_no = st.columns(2)
+                    with col_yes:
+                        if st.button("✅ Yes, Delete", use_container_width=True):
+                            try:
+                                if file_path and os.path.isfile(file_path):
+                                    os.remove(file_path)
+                                    # Clear selection and related state
+                                    st.session_state.selected_file = None
+                                    st.session_state.file_name = ""
+                                    st.session_state.last_selected_file = None
+                                    st.session_state.edit_mode = False
+                                    st.session_state.editor_content = ""
+                                    st.session_state.original_content = ""
+                                    st.session_state.has_unsaved_changes = False
+                                    st.session_state.confirm_save = False
+                                    st.session_state.confirm_delete = False
+                                    # Reset AI summary state
+                                    st.session_state.ai_summary = ""
+                                    st.session_state.ai_last_template_used = ""
+                                    st.session_state.ai_summary_tokens = None
+                                    st.session_state.ai_generating = False
+                                    st.success("File deleted.")
+                                    st.rerun()
+                                else:
+                                    st.error("Selected file not found or is not a file.")
+                                    st.session_state.confirm_delete = False
+                            except Exception as e:
+                                st.error(f"Error deleting file: {str(e)}")
+                                st.session_state.confirm_delete = False
+                    with col_no:
+                        if st.button("❌ Cancel", use_container_width=True):
+                            st.session_state.confirm_delete = False
+                            st.rerun()
+
             # Layout options (only show in edit mode)
             if st.session_state.edit_mode:
                 st.session_state.editor_layout = st.radio(
@@ -1008,7 +1232,7 @@ def main():
                 )
                 
                 # Unsaved changes indicator
-                if check_unsaved_changes():
+                if False and check_unsaved_changes():
                     st.warning("⚠️ Unsaved changes")
                 else:
                     st.success("✅ No unsaved changes")
