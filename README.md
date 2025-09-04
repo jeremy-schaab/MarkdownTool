@@ -25,7 +25,7 @@ A powerful, web-based markdown file viewer, editor, and AI-powered summarization
 - **GPT-5 Mini Integration**: Generate intelligent summaries using Azure OpenAI's GPT-5 Mini model
 - **5 Summary Templates**: Choose from High Level, Detailed Overview, Architectural, Technical Detail, or Technical Review perspectives
 - **Multiple Display Layouts**: View summaries in sidebar, side-by-side, or tabbed layouts
-- **Project Integration**: Summaries automatically saved to `AISummary/` folder in your project directory
+- **Project Integration**: Summaries are saved to `ai-summary/<analysis-name>/` in your project directory
 - **Large Document Support**: Process documents up to ~1 million characters with 128k token output capacity
 - **Smart File Organization**: Auto-generated filenames with metadata headers for easy tracking
 
@@ -174,13 +174,13 @@ Full requirements are listed in `requirements.txt`.
    - **Tabbed**: Separate tabs for document and summary
 
 4. **Generate Summary**: Click "✨ Generate Summary" button
-5. **Save to Project**: Click "💾 Save to Project" to save directly to `AISummary/` folder
+5. **Save to Project**: Click "💾 Save to Project" to save directly to `ai-summary/<analysis-name>/` folder
 
 #### AI Summary Features
 - **Large Document Support**: Process files up to ~1 million characters
 - **Smart File Naming**: `[filename]_[template]_summary.md`
 - **Metadata Headers**: Include generation timestamp, template used, and source file
-- **Project Organization**: Summaries saved to `YourProject/AISummary/` folder
+- **Project Organization**: Summaries saved to `YourProject/ai-summary/<analysis-name>/` folder
 - **Multiple Templates**: Generate different perspectives of the same document
 
 #### Example Workflow for Product Briefs
@@ -189,7 +189,7 @@ Full requirements are listed in `requirements.txt`.
 2. Select product brief markdown file
 3. Generate "High Level Summary" for stakeholders
 4. Generate "Technical Review" for development team
-5. Both summaries automatically saved to AISummary/ folder
+5. Both summaries automatically saved to `ai-summary/<analysis-name>/` folder
 6. Access organized summaries anytime from your project
 ```
 
@@ -216,7 +216,7 @@ For AI summarization features, configure your Azure OpenAI credentials:
 ### File Permissions
 The application requires:
 - **Read access** to browse local folders
-- **Write access** to save files directly and create AISummary folders
+- **Write access** to save files directly and create `ai-summary` folders
 - **Network access** for Azure OpenAI API calls (if using AI features)
 
 Uploaded files are handled through temporary storage.
@@ -250,7 +250,7 @@ To test AI summarization:
 1. **Set up Azure OpenAI credentials** in `.env` file
 2. **Select a test file** (e.g., `guide.md` for comprehensive content)
 3. **Generate summaries** with different templates
-4. **Check `test_files/AISummary/`** folder for saved summaries
+4. **Check `test_files/ai-summary/`** folder for saved summaries
 
 ### Performance Testing
 - **Large files**: Test with documents up to 1MB for AI processing

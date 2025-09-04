@@ -403,7 +403,7 @@ def save_file_directly(file_path, content):
         return False, f"Error saving file: {str(e)}"
 
 def get_ai_summary_folder():
-    """Get or create the AISummary folder in the current project directory"""
+    """Get or create the ai-summary folder in the current project directory"""
     if 'last_folder_path' not in st.session_state:
         return None, "No folder selected"
     
@@ -411,27 +411,33 @@ def get_ai_summary_folder():
     if not base_folder or not os.path.exists(base_folder):
         return None, "Invalid project folder path"
     
-    summary_folder = os.path.join(base_folder, "AISummary")
+    # New folder name per request
+    summary_folder = os.path.join(base_folder, "ai-summary")
     
     try:
         # Create the folder if it doesn't exist
         if not os.path.exists(summary_folder):
             os.makedirs(summary_folder)
-        return summary_folder, "AISummary folder ready"
+        return summary_folder, "ai-summary folder ready"
     except Exception as e:
-        return None, f"Error creating AISummary folder: {str(e)}"
+        return None, f"Error creating ai-summary folder: {str(e)}"
 
 def save_ai_summary_to_project(summary_content, base_filename, template_name):
-    """Save AI summary to the project's AISummary folder"""
+    """Save AI summary to project's ai-summary/<analysis-name>/ folder"""
     summary_folder, message = get_ai_summary_folder()
     if not summary_folder:
         return False, message
     
-    # Create a descriptive filename
-    safe_template = template_name.replace(" ", "_").lower()
+    # Build subfolder using analysis/template name (lowercase, hyphenated)
+    safe_template = re.sub(r"[^a-z0-9-_]", "", template_name.replace(" ", "-").lower())
+    target_dir = os.path.join(summary_folder, safe_template)
+    if not os.path.exists(target_dir):
+        os.makedirs(target_dir, exist_ok=True)
+
+    # Use the base file name with a '_summary' suffix, extension .md
     safe_filename = base_filename.replace(".md", "").replace(".markdown", "")
-    summary_filename = f"{safe_filename}_{safe_template}_summary.md"
-    full_path = os.path.join(summary_folder, summary_filename)
+    summary_filename = f"{safe_filename}_summary.md"
+    full_path = os.path.join(target_dir, summary_filename)
     
     try:
         with open(full_path, 'w', encoding='utf-8') as file:
@@ -443,7 +449,8 @@ def save_ai_summary_to_project(summary_content, base_filename, template_name):
             file.write("---\n\n")
             file.write(summary_content)
         
-        return True, f"Summary saved to: AISummary/{summary_filename}"
+        rel_display = os.path.relpath(full_path, st.session_state.last_folder_path) if 'last_folder_path' in st.session_state else full_path
+        return True, f"Summary saved to: {rel_display}"
     except Exception as e:
         return False, f"Error saving summary: {str(e)}"
 
