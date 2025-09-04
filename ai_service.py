@@ -8,6 +8,22 @@ import streamlit as st
 # Load environment variables
 load_dotenv()
 
+# Base guidance that is always included with custom prompts
+CUSTOM_PROMPT_BASE_GUIDELINES = """
+**Format Requirements:**
+- Use clear Markdown headers (# ## ###) to organize review sections
+- Use bullet points for strengths, weaknesses, and recommendations
+- Use numbered lists for prioritized action items or steps
+- Use **bold** for important findings and key recommendations
+- Use *italic* for document references and specific concerns
+- Use `code` formatting for specific technical issues
+- Include checkboxes (- [ ]) for actionable items
+- Structure as a professional review document with clear formatting
+"""
+
+CUSTOM_PROMPT_BASE_CONTENT = """Document content:
+{content}"""
+
 class AIService:
     def __init__(self):
         self.client = None
@@ -275,6 +291,62 @@ Original document content:
                     'summary': ''
                 }
         
+        except Exception as e:
+            return {
+                'success': False,
+                'error': f'Error generating summary: {str(e)}',
+                'summary': ''
+            }
+
+    def generate_with_prompt(self, content: str, prompt_template: str, progress_callback=None) -> Dict[str, Any]:
+        """Generate a summary using a custom prompt template string.
+
+        The user's prompt is always combined with a standard base that includes
+        formatting requirements. If the user's prompt does not contain '{content}',
+        the document content is appended automatically at the end.
+        """
+        if not self.is_configured():
+            return {
+                'success': False,
+                'error': 'AI service is not properly configured. Please check your Azure OpenAI credentials.',
+                'summary': ''
+            }
+
+        user_tmpl = (prompt_template or "").strip()
+
+        parts = []
+        if user_tmpl:
+            parts.append(user_tmpl)
+        # Always include formatting guidance
+        parts.append(CUSTOM_PROMPT_BASE_GUIDELINES.strip())
+        # Only add content directive if the user hasn't placed it
+        if "{content}" not in user_tmpl:
+            parts.append(CUSTOM_PROMPT_BASE_CONTENT)
+
+        prompt = "\n\n".join(parts).format(content=content)
+
+        try:
+            if progress_callback:
+                progress_callback("Sending request to Azure OpenAI...")
+
+            response = self._call_api_with_retry(prompt, progress_callback)
+
+            if response:
+                summary = response.choices[0].message.content
+                return {
+                    'success': True,
+                    'summary': summary,
+                    'template_name': 'Custom Prompt',
+                    'template_description': 'User-provided prompt',
+                    'tokens_used': response.usage.total_tokens if response.usage else None
+                }
+            else:
+                return {
+                    'success': False,
+                    'error': 'Failed to get response from Azure OpenAI',
+                    'summary': ''
+                }
+
         except Exception as e:
             return {
                 'success': False,
