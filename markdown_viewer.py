@@ -20,6 +20,49 @@ import re
 from html.parser import HTMLParser
 import json
 from azure_sync_service import push_to_azure, pull_from_azure
+import tkinter as tk
+from tkinter import filedialog
+from datetime import datetime
+
+def select_folder():
+    """Open a folder selection dialog and return the selected folder path."""
+    try:
+        # Create a root window and hide it
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes('-topmost', True)  # Make dialog appear on top
+        
+        # Open folder selection dialog
+        folder_path = filedialog.askdirectory(
+            title="Select Folder to Browse",
+            initialdir=st.session_state.get('last_folder_path', '')
+        )
+        
+        root.destroy()  # Clean up the root window
+        return folder_path
+    except Exception as e:
+        st.error(f"Error opening folder dialog: {e}")
+        return None
+
+def select_project_root_folder():
+    """Open a folder selection dialog for project root and return the selected folder path."""
+    try:
+        # Create a root window and hide it
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes('-topmost', True)  # Make dialog appear on top
+        
+        # Open folder selection dialog
+        folder_path = filedialog.askdirectory(
+            title="Select Project Root Folder",
+            initialdir=st.session_state.get('project_root_folder', '')
+        )
+        
+        root.destroy()  # Clean up the root window
+        return folder_path
+    except Exception as e:
+        st.error(f"Error opening folder dialog: {e}")
+        return None
 
 def save_config(project_root, doc_folder, connection_string):
     """Saves the configuration to a json file."""
@@ -62,21 +105,118 @@ def load_config(project_root):
         with open(config_path, 'r', encoding='utf-8') as f:
             config_data = json.load(f)
 
-        st.session_state.project_root_folder = config_data.get("project_root_folder", "")
-        st.session_state.azure_connection_string = config_data.get("azure_connection_string", "")
-
+        # Store config data for loading into widgets
+        st.session_state.config_data = config_data
+        
+        # Store selected values for use in the widgets
+        st.session_state.selected_project_root = config_data.get("project_root_folder", "")
+        st.session_state.selected_azure_connection = config_data.get("azure_connection_string", "")
+        
+        # Update document folder path
         doc_folder = config_data.get("project_doc_folder", "")
         if doc_folder:
             st.session_state.last_folder_path = doc_folder
 
         st.session_state.config_loaded = True
-        st.success("Configuration loaded.")
-        # We need to rerun to see the changes in the widgets
-        st.rerun()
+        st.success("Configuration loaded successfully!")
+        st.rerun()  # Automatically refresh to show loaded values
         return True
     except Exception as e:
         st.error(f"Error loading configuration: {e}")
         return False
+
+def get_sessions_folder():
+    """Get or create the sessions folder in the application directory"""
+    app_dir = os.path.dirname(os.path.abspath(__file__))
+    sessions_dir = os.path.join(app_dir, "sessions")
+    
+    try:
+        os.makedirs(sessions_dir, exist_ok=True)
+        return sessions_dir
+    except Exception as e:
+        st.error(f"Error creating sessions folder: {e}")
+        return None
+
+def save_project_root_session(project_root_path):
+    """Save project root selection to session history"""
+    if not project_root_path or not os.path.exists(project_root_path):
+        return False
+    
+    sessions_dir = get_sessions_folder()
+    if not sessions_dir:
+        return False
+    
+    session_file = os.path.join(sessions_dir, "recent_projects.json")
+    
+    try:
+        # Load existing sessions
+        sessions_data = {"recent_projects": []}
+        if os.path.exists(session_file):
+            with open(session_file, 'r', encoding='utf-8') as f:
+                sessions_data = json.load(f)
+        
+        # Create new session entry
+        project_name = os.path.basename(project_root_path)
+        session_entry = {
+            "project_name": project_name,
+            "project_root": project_root_path,
+            "last_accessed": datetime.now().isoformat(),
+            "display_name": f"{project_name} ({project_root_path})"
+        }
+        
+        # Remove if already exists (to update timestamp)
+        sessions_data["recent_projects"] = [
+            p for p in sessions_data.get("recent_projects", []) 
+            if p.get("project_root") != project_root_path
+        ]
+        
+        # Add to beginning of list
+        sessions_data["recent_projects"].insert(0, session_entry)
+        
+        # Keep only last 10 projects
+        sessions_data["recent_projects"] = sessions_data["recent_projects"][:10]
+        
+        # Save updated sessions
+        with open(session_file, 'w', encoding='utf-8') as f:
+            json.dump(sessions_data, f, indent=2)
+        
+        return True
+        
+    except Exception as e:
+        st.error(f"Error saving project session: {e}")
+        return False
+
+def load_recent_projects():
+    """Load recent project roots from session history"""
+    sessions_dir = get_sessions_folder()
+    if not sessions_dir:
+        return []
+    
+    session_file = os.path.join(sessions_dir, "recent_projects.json")
+    
+    try:
+        if os.path.exists(session_file):
+            with open(session_file, 'r', encoding='utf-8') as f:
+                sessions_data = json.load(f)
+            
+            # Filter out projects that no longer exist
+            valid_projects = []
+            for project in sessions_data.get("recent_projects", []):
+                if os.path.exists(project.get("project_root", "")):
+                    valid_projects.append(project)
+            
+            # Update the file if we filtered out invalid projects
+            if len(valid_projects) != len(sessions_data.get("recent_projects", [])):
+                sessions_data["recent_projects"] = valid_projects
+                with open(session_file, 'w', encoding='utf-8') as f:
+                    json.dump(sessions_data, f, indent=2)
+            
+            return valid_projects
+        
+    except Exception as e:
+        st.error(f"Error loading project sessions: {e}")
+    
+    return []
 
 def find_markdown_files(directory):
     """Recursively find all markdown files in a directory"""
@@ -416,9 +556,17 @@ def initialize_session_state():
     """Initialize session state variables for editor functionality"""
     # Cloud Sync state
     if 'project_root_folder' not in st.session_state:
-        st.session_state.project_root_folder = ""
+        # Check if we have loaded config data to populate from
+        if 'config_data' in st.session_state:
+            st.session_state.project_root_folder = st.session_state.config_data.get("project_root_folder", "")
+        else:
+            st.session_state.project_root_folder = ""
     if 'azure_connection_string' not in st.session_state:
-        st.session_state.azure_connection_string = ""
+        # Check if we have loaded config data to populate from
+        if 'config_data' in st.session_state:
+            st.session_state.azure_connection_string = st.session_state.config_data.get("azure_connection_string", "")
+        else:
+            st.session_state.azure_connection_string = ""
     if 'config_loaded' not in st.session_state:
         st.session_state.config_loaded = False
 
@@ -932,23 +1080,23 @@ def main():
     
     # Sidebar with file selection
     with st.sidebar:
-        # File uploader for markdown files
-        uploaded_file = st.file_uploader(
-            "Choose a markdown file",
-            type=['md', 'markdown'],
-            help="Upload a .md or .markdown file to view"
-        )
-        
-        if uploaded_file is not None:
-            # Save uploaded file temporarily and display it
-            with tempfile.NamedTemporaryFile(mode='w+', suffix='.md', delete=False) as tmp_file:
-                content = uploaded_file.getvalue().decode('utf-8')
-                tmp_file.write(content)
-                tmp_file.flush()
-                st.session_state.selected_file = tmp_file.name
-                st.session_state.file_name = uploaded_file.name
-        
-        st.divider()
+        # File uploader for markdown files (hidden for now)
+        # uploaded_file = st.file_uploader(
+        #     "Choose a markdown file",
+        #     type=['md', 'markdown'],
+        #     help="Upload a .md or .markdown file to view"
+        # )
+        # 
+        # if uploaded_file is not None:
+        #     # Save uploaded file temporarily and display it
+        #     with tempfile.NamedTemporaryFile(mode='w+', suffix='.md', delete=False) as tmp_file:
+        #         content = uploaded_file.getvalue().decode('utf-8')
+        #         tmp_file.write(content)
+        #         tmp_file.flush()
+        #         st.session_state.selected_file = tmp_file.name
+        #         st.session_state.file_name = uploaded_file.name
+        # 
+        # st.divider()
         
         # Alternative: Browse local files (folder path input)
         st.subheader("Or browse local folder")
@@ -963,15 +1111,24 @@ def main():
             stored_folder = query_params.get('folder', '')
             if stored_folder and os.path.exists(stored_folder) and os.path.isdir(stored_folder):
                 st.session_state.last_folder_path = stored_folder
-            else:
-                st.session_state.last_folder_path = os.getcwd()
+            elif 'last_folder_path' not in st.session_state:
+                st.session_state.last_folder_path = ""
             
-        folder_path = st.text_input(
-            "Enter folder path:",
-            value=st.session_state.last_folder_path,
-            help="Enter the path to browse markdown files from your local system",
-            key="folder_path_input"
-        )
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            folder_path = st.text_input(
+                "Enter folder path:",
+                value=st.session_state.last_folder_path,
+                help="Enter the path to browse markdown files from your local system",
+                key="folder_path_input"
+            )
+        with col2:
+            st.write("") # Add some spacing
+            if st.button("📁 Browse", help="Select folder using file dialog"):
+                selected_folder = select_folder()
+                if selected_folder:
+                    st.session_state.last_folder_path = selected_folder
+                    st.rerun()
         
         # Update session state and URL when folder path changes
         if folder_path != st.session_state.last_folder_path:
@@ -1023,34 +1180,99 @@ def main():
         st.divider()
         st.subheader("☁️ Cloud Sync")
 
-        st.text_input(
-            "Project Root Folder",
-            key="project_root_folder",
-            help="The root folder of your project. The config file will be stored here."
-        )
+        # Recent projects dropdown
+        recent_projects = load_recent_projects()
+        if recent_projects:
+            selected_recent = st.selectbox(
+                "Recent Projects",
+                options=[""] + [p["project_root"] for p in recent_projects],
+                format_func=lambda x: "Select a recent project..." if x == "" else next((p["display_name"] for p in recent_projects if p["project_root"] == x), x),
+                key="recent_project_selector",
+                help="Select from recently used project root folders"
+            )
+            
+            # If a recent project is selected, update the project root and auto-load config
+            if selected_recent and selected_recent != st.session_state.get('project_root_folder', ''):
+                st.session_state.selected_project_root = selected_recent
+                # Auto-load config if it exists
+                config_path = os.path.join(selected_recent, ".fyiai", "cloud", "sync", "config.json")
+                if os.path.exists(config_path):
+                    # Load the config automatically
+                    load_config(selected_recent)
+                else:
+                    # Just update the project root and rerun to show the selection
+                    st.rerun()
 
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            # Use selected folder if available, otherwise use session state value
+            project_root_value = st.session_state.get('selected_project_root', st.session_state.get('project_root_folder', ''))
+            st.text_input(
+                "Project Root Folder",
+                value=project_root_value,
+                key="project_root_folder",
+                help="The root folder of your project. The config file will be stored here."
+            )
+        with col2:
+            st.write("") # Add some spacing
+            if st.button("📁 Browse", help="Select project root folder using file dialog"):
+                selected_folder = select_project_root_folder()
+                if selected_folder:
+                    # Store the selected folder for use in the next run
+                    st.session_state.selected_project_root = selected_folder
+                    # Save to session history
+                    save_project_root_session(selected_folder)
+                    st.rerun()
+        
+        # Clear the selected folder after it's been used and save to session if it's a new selection
+        if 'selected_project_root' in st.session_state and st.session_state.project_root_folder:
+            # Save to session history if this is a different project root
+            if st.session_state.selected_project_root != st.session_state.get('last_saved_project_root'):
+                save_project_root_session(st.session_state.project_root_folder)
+                st.session_state.last_saved_project_root = st.session_state.project_root_folder
+            del st.session_state.selected_project_root
+
+        # Get the current folder being browsed
+        current_doc_folder = folder_path if folder_path and os.path.exists(folder_path) else ""
+        
+        # Show validation warning if project root and doc folder are set but doc folder is not within project root
+        project_root = st.session_state.get('project_root_folder', '')
+        if project_root and current_doc_folder:
+            try:
+                # Check if doc folder is within project root
+                relative_path = os.path.relpath(current_doc_folder, project_root)
+                if relative_path.startswith('..'):
+                    st.warning("⚠️ Warning: Document folder is outside the project root folder.")
+            except ValueError:
+                st.warning("⚠️ Warning: Document folder and project root are on different drives.")
+        
         st.text_input(
             "Project Doc Folder",
-            value=folder_path, # from the file browser
+            value=current_doc_folder,
             disabled=True,
-            help="This is the folder being browsed above. It will be synced."
+            help="This is the folder being browsed above. It will be synced. Should ideally be within your project root."
         )
 
+        # Use selected connection string if available, otherwise use session state value
+        azure_conn_value = st.session_state.get('selected_azure_connection', st.session_state.get('azure_connection_string', ''))
         st.text_input(
             "Azure Connection String",
+            value=azure_conn_value,
             key="azure_connection_string",
             type="password",
             help="Your Azure Blob Storage connection string."
         )
-
-        project_doc_folder = folder_path # from the file browser
+        
+        # Clear the selected connection string after it's been used
+        if 'selected_azure_connection' in st.session_state and st.session_state.azure_connection_string:
+            del st.session_state.selected_azure_connection
 
         c1, c2 = st.columns(2)
         with c1:
             if st.button("💾 Save Config", use_container_width=True):
                 save_config(
                     st.session_state.project_root_folder,
-                    project_doc_folder,
+                    current_doc_folder,  # Use the validated current doc folder
                     st.session_state.azure_connection_string
                 )
         with c2:
@@ -1061,7 +1283,8 @@ def main():
 
         # Check if the config is ready for sync operations
         sync_ready = (st.session_state.project_root_folder and
-                      st.session_state.azure_connection_string)
+                      st.session_state.azure_connection_string and
+                      current_doc_folder)  # Also require doc folder
 
         c3, c4 = st.columns(2)
         with c3:
@@ -1069,14 +1292,14 @@ def main():
                 push_to_azure(
                     st.session_state.azure_connection_string,
                     st.session_state.project_root_folder,
-                    project_doc_folder # from file browser
+                    current_doc_folder  # Use the validated current doc folder
                 )
         with c4:
             if st.button("⬇️ Pull from Azure", use_container_width=True, disabled=not sync_ready):
                 pull_from_azure(
                     st.session_state.azure_connection_string,
                     st.session_state.project_root_folder,
-                    project_doc_folder # from file browser
+                    current_doc_folder  # Use the validated current doc folder
                 )
         
         # Editor controls in sidebar (always show for demonstration)
