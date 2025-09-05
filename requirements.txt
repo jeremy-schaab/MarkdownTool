@@ -6,3 +6,4 @@ openai
 python-dotenv
 reportlab
 markdown2
+azure-storage-blob
