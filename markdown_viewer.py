@@ -8,6 +8,7 @@ import base64
 import tempfile
 import time
 from ai_service import ai_service
+from ai_service import CUSTOM_PROMPT_BASE_GUIDELINES, CUSTOM_PROMPT_BASE_CONTENT
 import markdown2
 from reportlab.lib.pagesizes import letter, A4
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, Preformatted
@@ -1315,6 +1316,24 @@ def main():
                 
                 # Show template description
                 template_info = templates[selected_template_key]
+                # Optional: customize the prompt used
+                st.checkbox(
+                    "Use custom prompt",
+                    key="ai_custom_prompt_enabled",
+                    value=st.session_state.get('ai_custom_prompt_enabled', False),
+                    help="When enabled, the text below will be used. Include {content} where the document should be inserted. If omitted, the document will be appended automatically."
+                )
+                if 'ai_prompt_template_key' not in st.session_state:
+                    st.session_state.ai_prompt_template_key = selected_template_key
+                if ('ai_custom_prompt_text' not in st.session_state) or (st.session_state.ai_prompt_template_key != selected_template_key):
+                    st.session_state.ai_custom_prompt_text = template_info.get('prompt', '')
+                    st.session_state.ai_prompt_template_key = selected_template_key
+                st.session_state.ai_custom_prompt_text = st.text_area(
+                    "Prompt",
+                    value=st.session_state.ai_custom_prompt_text,
+                    height=180,
+                    help="You can reference the document with {content}"
+                )
                 st.caption(f"📝 {template_info['description']}")
                 
                 # Layout selector (only show when there's a summary)
@@ -1363,7 +1382,11 @@ def main():
                             progress_bar.progress(0.5)
                         
                         progress_callback("Generating summary...")
-                        result = ai_service.generate_summary(file_content, selected_template_key, progress_callback)
+                        if st.session_state.get('ai_custom_prompt_enabled', False):
+                            prompt_template = st.session_state.get('ai_custom_prompt_text', '')
+                            result = ai_service.generate_with_prompt(file_content, prompt_template, progress_callback)
+                        else:
+                            result = ai_service.generate_summary(file_content, selected_template_key, progress_callback)
                         
                         progress_bar.progress(1.0)
                         status_text.text("Summary generated!")
