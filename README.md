@@ -21,6 +21,13 @@ A powerful, web-based markdown file viewer, editor, and AI-powered summarization
 - **Unsaved Changes Detection**: Visual indicators for modified content
 - **Auto-backup**: Preserves original content for comparison
 
+### ☁️ Cloud Sync with Azure Blob Storage
+- **Two-Way Sync**: Push local changes to an Azure Blob Storage container or pull remote changes to your local machine.
+- **Easy Configuration**: Set your Project Root and paste your Azure Connection String in the sidebar.
+- **Automatic Container Management**: A container named `fyiai-{project-name}` is automatically used (and created if it doesn't exist).
+- **Preserves Folder Structure**: The sync process maintains the relative directory structure of your files.
+- **Configuration File**: Settings are stored in `.fyiai/cloud/sync/config.json` within your project root, making it easy to share or back up.
+
 ### AI-Powered Summarization 🤖
 - **GPT-5 Mini Integration**: Generate intelligent summaries using Azure OpenAI's GPT-5 Mini model
 - **5 Summary Templates**: Choose from High Level, Detailed Overview, Architectural, Technical Detail, or Technical Review perspectives
@@ -104,6 +111,7 @@ The application requires the following Python packages:
 - `streamlit-ace` - Code editor component for markdown editing
 - `openai` - Azure OpenAI integration for AI summarization
 - `python-dotenv` - Environment variable management for secure configuration
+- `azure-storage-blob` - Client library for Azure Blob Storage synchronization
 
 Full requirements are listed in `requirements.txt`.
 
