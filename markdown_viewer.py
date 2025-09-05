@@ -18,6 +18,159 @@ from reportlab.lib import colors
 from reportlab.lib.enums import TA_LEFT, TA_CENTER
 import re
 from html.parser import HTMLParser
+import json
+from azure.storage.blob import BlobServiceClient
+from azure.core.exceptions import ResourceExistsError
+
+def push_to_azure(connection_string, project_root, doc_folder):
+    """Pushes the contents of the doc folder to Azure Blob Storage."""
+    if not all([connection_string, project_root, doc_folder]):
+        st.error("Configuration is missing. Please save the configuration first.")
+        return
+
+    try:
+        # Sanitize project name for container
+        project_name = os.path.basename(project_root).lower().replace(" ", "-")
+        container_name = f"fyiai-{project_name}"
+
+        # Create a blob service client
+        blob_service_client = BlobServiceClient.from_connection_string(connection_string)
+
+        # Create container if it doesn't exist
+        try:
+            container_client = blob_service_client.create_container(container_name)
+            st.info(f"Container '{container_name}' created.")
+        except ResourceExistsError:
+            container_client = blob_service_client.get_container_client(container_name)
+            st.info(f"Container '{container_name}' already exists.")
+
+        st.info(f"Starting upload of files from '{doc_folder}' to container '{container_name}'...")
+
+        # Walk through the doc folder and upload files
+        files_uploaded_count = 0
+        for root, dirs, files in os.walk(doc_folder):
+            for file_name in files:
+                local_path = os.path.join(root, file_name)
+                # Create a blob path that preserves the relative structure
+                relative_path = os.path.relpath(local_path, doc_folder)
+                # Azure blob storage uses forward slashes
+                blob_path = relative_path.replace(os.sep, '/')
+
+                blob_client = container_client.get_blob_client(blob_path)
+
+                with st.spinner(f"Uploading {blob_path}..."):
+                    with open(local_path, "rb") as data:
+                        blob_client.upload_blob(data, overwrite=True)
+                files_uploaded_count += 1
+
+        st.success(f"✅ Push to Azure complete! {files_uploaded_count} files uploaded.")
+
+    except Exception as e:
+        st.error(f"An error occurred during push to Azure: {e}")
+
+def pull_from_azure(connection_string, project_root, doc_folder):
+    """Pulls the contents of a container from Azure Blob Storage to the doc folder."""
+    if not all([connection_string, project_root, doc_folder]):
+        st.error("Configuration is missing. Please save the configuration first.")
+        return
+
+    try:
+        # Sanitize project name for container
+        project_name = os.path.basename(project_root).lower().replace(" ", "-")
+        container_name = f"fyiai-{project_name}"
+
+        # Create a blob service client
+        blob_service_client = BlobServiceClient.from_connection_string(connection_string)
+
+        container_client = blob_service_client.get_container_client(container_name)
+
+        # Check if container exists
+        if not container_client.exists():
+            st.error(f"Container '{container_name}' does not exist. Nothing to pull.")
+            return
+
+        st.info(f"Starting download of files from container '{container_name}' to '{doc_folder}'...")
+
+        blob_list = container_client.list_blobs()
+        files_downloaded_count = 0
+
+        for blob in blob_list:
+            blob_client = container_client.get_blob_client(blob.name)
+
+            # Construct local path
+            local_path = os.path.join(doc_folder, blob.name.replace('/', os.sep))
+
+            # Create local directories if they don't exist
+            os.makedirs(os.path.dirname(local_path), exist_ok=True)
+
+            with st.spinner(f"Downloading {blob.name}..."):
+                with open(local_path, "wb") as download_file:
+                    download_file.write(blob_client.download_blob().readall())
+            files_downloaded_count += 1
+
+        st.success(f"✅ Pull from Azure complete! {files_downloaded_count} files downloaded.")
+        # Rerun to refresh the file browser
+        st.rerun()
+
+    except Exception as e:
+        st.error(f"An error occurred during pull from Azure: {e}")
+
+def save_config(project_root, doc_folder, connection_string):
+    """Saves the configuration to a json file."""
+    if not project_root or not os.path.isdir(project_root):
+        st.error("Project Root Folder is not a valid directory.")
+        return False
+
+    config_dir = os.path.join(project_root, ".fyiai", "cloud", "sync")
+    config_path = os.path.join(config_dir, "config.json")
+
+    try:
+        os.makedirs(config_dir, exist_ok=True)
+        config_data = {
+            "project_root_folder": project_root,
+            "project_doc_folder": doc_folder,
+            "azure_connection_string": connection_string
+        }
+        with open(config_path, 'w', encoding='utf-8') as f:
+            json.dump(config_data, f, indent=4)
+
+        st.success(f"Configuration saved to {config_path}")
+        return True
+    except Exception as e:
+        st.error(f"Error saving configuration: {e}")
+        return False
+
+def load_config(project_root):
+    """Loads config from json file and updates session state."""
+    if not project_root:
+        st.error("Please enter a Project Root Folder to load the configuration from.")
+        return False
+
+    config_path = os.path.join(project_root, ".fyiai", "cloud", "sync", "config.json")
+
+    if not os.path.exists(config_path):
+        st.warning(f"No config file found at {config_path}")
+        return False
+
+    try:
+        with open(config_path, 'r', encoding='utf-8') as f:
+            config_data = json.load(f)
+
+        st.session_state.project_root_folder = config_data.get("project_root_folder", "")
+        st.session_state.azure_connection_string = config_data.get("azure_connection_string", "")
+
+        doc_folder = config_data.get("project_doc_folder", "")
+        if doc_folder:
+            st.session_state.last_folder_path = doc_folder
+
+        st.session_state.config_loaded = True
+        st.success("Configuration loaded.")
+        # We need to rerun to see the changes in the widgets
+        st.rerun()
+        return True
+    except Exception as e:
+        st.error(f"Error loading configuration: {e}")
+        return False
 
 def find_markdown_files(directory):
     """Recursively find all markdown files in a directory"""
@@ -355,6 +508,14 @@ def resolve_markdown_link(current_file_path, link_href):
 
 def initialize_session_state():
     """Initialize session state variables for editor functionality"""
+    # Cloud Sync state
+    if 'project_root_folder' not in st.session_state:
+        st.session_state.project_root_folder = ""
+    if 'azure_connection_string' not in st.session_state:
+        st.session_state.azure_connection_string = ""
+    if 'config_loaded' not in st.session_state:
+        st.session_state.config_loaded = False
+
     if 'edit_mode' not in st.session_state:
         st.session_state.edit_mode = False
     if 'editor_content' not in st.session_state:
@@ -952,6 +1113,65 @@ def main():
                 st.info("No markdown files found in this folder")
         elif folder_path:
             st.error("Invalid folder path")
+
+        st.divider()
+        st.subheader("☁️ Cloud Sync")
+
+        st.text_input(
+            "Project Root Folder",
+            key="project_root_folder",
+            help="The root folder of your project. The config file will be stored here."
+        )
+
+        st.text_input(
+            "Project Doc Folder",
+            value=folder_path, # from the file browser
+            disabled=True,
+            help="This is the folder being browsed above. It will be synced."
+        )
+
+        st.text_input(
+            "Azure Connection String",
+            key="azure_connection_string",
+            type="password",
+            help="Your Azure Blob Storage connection string."
+        )
+
+        project_doc_folder = folder_path # from the file browser
+
+        c1, c2 = st.columns(2)
+        with c1:
+            if st.button("💾 Save Config", use_container_width=True):
+                save_config(
+                    st.session_state.project_root_folder,
+                    project_doc_folder,
+                    st.session_state.azure_connection_string
+                )
+        with c2:
+            if st.button("📂 Load Config", use_container_width=True):
+                load_config(st.session_state.project_root_folder)
+
+        st.divider()
+
+        # Check if the config is ready for sync operations
+        sync_ready = (st.session_state.project_root_folder and
+                      st.session_state.azure_connection_string)
+
+        c3, c4 = st.columns(2)
+        with c3:
+            if st.button("⬆️ Push to Azure", use_container_width=True, disabled=not sync_ready):
+                push_to_azure(
+                    st.session_state.azure_connection_string,
+                    st.session_state.project_root_folder,
+                    project_doc_folder # from file browser
+                )
+        with c4:
+            if st.button("⬇️ Pull from Azure", use_container_width=True, disabled=not sync_ready):
+                pull_from_azure(
+                    st.session_state.azure_connection_string,
+                    st.session_state.project_root_folder,
+                    project_doc_folder # from file browser
+                )
         
         # Editor controls in sidebar (always show for demonstration)
         if True:  # Temporarily always show editor controls
