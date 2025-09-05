@@ -1677,12 +1677,15 @@ def main():
                 if ('ai_custom_prompt_text' not in st.session_state) or (st.session_state.ai_prompt_template_key != selected_template_key):
                     st.session_state.ai_custom_prompt_text = template_info.get('prompt', '')
                     st.session_state.ai_prompt_template_key = selected_template_key
-                st.session_state.ai_custom_prompt_text = st.text_area(
-                    "Prompt",
-                    value=st.session_state.ai_custom_prompt_text,
-                    height=180,
-                    help="You can reference the document with {content}"
-                )
+                
+                # Only show the prompt text area when custom prompt is enabled
+                if st.session_state.get('ai_custom_prompt_enabled', False):
+                    st.session_state.ai_custom_prompt_text = st.text_area(
+                        "Prompt",
+                        value=st.session_state.ai_custom_prompt_text,
+                        height=180,
+                        help="You can reference the document with {content}"
+                    )
                 st.caption(f"📝 {template_info['description']}")
                 
                 # Layout selector (only show when there's a summary)
