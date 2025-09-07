@@ -1,0 +1,131 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "markdown-manager"
+version = "1.2.0"
+description = "A production-grade Streamlit-based markdown file viewer with AI-powered summarization and editing capabilities"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Jeremy Schaab", email = "jeremy@example.com"}
+]
+maintainers = [
+    {name = "Jeremy Schaab", email = "jeremy@example.com"}
+]
+keywords = ["markdown", "viewer", "editor", "ai", "summarization", "streamlit"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Text Processing :: Markup",
+    "Topic :: Documentation",
+    "Topic :: Software Development :: Documentation",
+]
+requires-python = ">=3.8"
+dependencies = [
+    "streamlit>=1.28.0",
+    "markdown>=3.5.0",
+    "pygments>=2.16.0",
+    "streamlit-ace>=0.1.1",
+    "openai>=1.0.0",
+    "python-dotenv>=1.0.0",
+    "azure-storage-blob>=12.19.0",
+    "reportlab>=4.0.0",
+    "markdown2>=2.4.0"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "black>=23.0.0",
+    "isort>=5.12.0",
+    "flake8>=6.0.0",
+    "mypy>=1.5.0",
+    "pre-commit>=3.3.0"
+]
+test = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.11.0"
+]
+build = [
+    "pyinstaller>=5.13.0",
+    "pyinstaller-hooks-contrib>=2023.5"
+]
+
+[project.urls]
+Homepage = "https://github.com/jeremy-schaab/MarkdownTool"
+Documentation = "https://github.com/jeremy-schaab/MarkdownTool#readme"
+Repository = "https://github.com/jeremy-schaab/MarkdownTool.git"
+"Bug Tracker" = "https://github.com/jeremy-schaab/MarkdownTool/issues"
+
+[project.scripts]
+markdown-manager = "markdown_manager.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"*" = ["*.md", "*.txt", "*.example", "*.json"]
+
+[tool.black]
+line-length = 88
+target-version = ['py38']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 88
+known_first_party = ["markdown_manager"]
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q --strict-markers --cov=src/markdown_manager --cov-report=term-missing"
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
+[tool.coverage.run]
+source = ["src/markdown_manager"]
+omit = ["*/tests/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+]

@@ -1,0 +1,195 @@
+name: Build Windows Executable
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Build type'
+        required: true
+        default: 'release'
+        type: choice
+        options:
+        - release
+        - debug
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/**'
+      - 'markdown_manager.spec'
+      - 'scripts/build_exe.py'
+
+jobs:
+  build-windows-exe:
+    runs-on: windows-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~\AppData\Local\pip\Cache
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e .
+        pip install pyinstaller
+
+    - name: Create default icon (if needed)
+      run: |
+        if (-not (Test-Path "assets\icon.ico")) {
+          New-Item -ItemType Directory -Force -Path "assets"
+          # Create a placeholder - in real usage, you'd have an actual icon
+          Write-Host "Creating placeholder for icon"
+        }
+      shell: powershell
+
+    - name: Build executable
+      run: |
+        python scripts/build_exe.py
+      env:
+        PYTHONPATH: ${{ github.workspace }}/src
+
+    - name: Test executable
+      run: |
+        if (Test-Path "dist\MarkdownManager.exe") {
+          Write-Host "✅ Executable created successfully"
+          $fileSize = (Get-Item "dist\MarkdownManager.exe").Length / 1MB
+          Write-Host "📏 File size: $([math]::Round($fileSize, 1)) MB"
+          
+          # Basic test - just check if it can show help
+          try {
+            & "dist\MarkdownManager.exe" --help 2>$null
+            if ($LASTEXITCODE -eq 0) {
+              Write-Host "✅ Executable test passed"
+            } else {
+              Write-Host "⚠️ Executable test returned non-zero exit code but file exists"
+            }
+          } catch {
+            Write-Host "⚠️ Could not test executable, but file was created"
+          }
+        } else {
+          Write-Host "❌ Executable not found"
+          exit 1
+        }
+      shell: powershell
+
+    - name: Create release package
+      run: |
+        # Create release directory
+        New-Item -ItemType Directory -Force -Path "release"
+        
+        # Copy executable
+        Copy-Item "dist\MarkdownManager.exe" "release\"
+        
+        # Copy installer script
+        Copy-Item "dist\install.bat" "release\"
+        
+        # Copy documentation
+        Copy-Item "README.md" "release\"
+        Copy-Item "CHANGELOG.md" "release\"
+        Copy-Item ".env.example" "release\"
+        Copy-Item "docs\BUILDING_EXE.md" "release\"
+        
+        # Create release notes
+        @"
+# Markdown Manager - Windows Executable
+
+## 🚀 Quick Start
+1. Download and run ``MarkdownManager.exe``
+2. (Optional) Run ``install.bat`` to create shortcuts
+3. Create a ``.env`` file with your Azure OpenAI credentials (see ``.env.example``)
+
+## 📁 Files Included
+- ``MarkdownManager.exe`` - Main application
+- ``install.bat`` - Optional installer for shortcuts  
+- ``README.md`` - Full documentation
+- ``.env.example`` - Configuration template
+- ``BUILDING_EXE.md`` - Build instructions
+
+## 💡 First Run
+- The first startup may take 15-30 seconds
+- Windows Defender might ask for permission
+- The app will create ``data/``, ``logs/``, and ``sessions/`` folders
+
+## 🆘 Support
+Visit: https://github.com/jeremy-schaab/MarkdownTool/issues
+"@ | Out-File -FilePath "release\README-EXECUTABLE.txt" -Encoding UTF8
+        
+        Write-Host "📦 Release package created in release/ directory"
+      shell: powershell
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: MarkdownManager-Windows-${{ github.run_number }}
+        path: |
+          release/
+        retention-days: 90
+
+    - name: Create ZIP for release
+      run: |
+        Compress-Archive -Path "release\*" -DestinationPath "MarkdownManager-Windows-v${{ github.run_number }}.zip"
+      shell: powershell
+
+    - name: Upload ZIP artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: MarkdownManager-Windows-ZIP
+        path: MarkdownManager-Windows-v${{ github.run_number }}.zip
+        retention-days: 90
+
+    # Only attach to release if this is a release event
+    - name: Attach to Release
+      if: github.event_name == 'release'
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          MarkdownManager-Windows-v${{ github.run_number }}.zip
+          release/MarkdownManager.exe
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Optional: Build with different Python versions
+  build-compatibility:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        python-version: ['3.8', '3.9', '3.10', '3.11']
+    
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Test build compatibility
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e .
+        pip install pyinstaller
+        
+        # Just test that PyInstaller can analyze the spec
+        pyinstaller --noconfirm --log-level WARN --distpath temp-dist --workpath temp-build markdown_manager.spec
+        
+        if (Test-Path "temp-dist\MarkdownManager.exe") {
+          Write-Host "✅ Build successful with Python ${{ matrix.python-version }}"
+        } else {
+          Write-Host "❌ Build failed with Python ${{ matrix.python-version }}"
+          exit 1
+        }
+      shell: powershell

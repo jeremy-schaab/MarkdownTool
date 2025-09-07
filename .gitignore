@@ -1,21 +1,68 @@
+# Project-specific
 /.qodo
-/logs
+/logs/
 /nul
-/__pycache__
+/data/
+/sessions/*.json
+bandit-report.json
 
 # Environment variables
 .env
+.env.local
+.env.production
 
 # Python
+__pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
 env/
 venv/
 ENV/
 env.bak/
 venv.bak/
+markdown-viewer-env/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+
+# Type checking
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Linting
+.flake8
+.pylintrc
 
 # IDE
 .vscode/
@@ -23,6 +70,8 @@ venv.bak/
 *.swp
 *.swo
 *~
+.spyderproject
+.spyproject
 
 # OS generated files
 .DS_Store
@@ -32,6 +81,7 @@ venv.bak/
 .Trashes
 ehthumbs.db
 Thumbs.db
+desktop.ini
 
 # Streamlit
 .streamlit/
@@ -39,3 +89,36 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp
+*.log
+
+# Docker
+.dockerignore
+
+# Documentation builds
+docs/_build/
+docs/build/
+site/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# pyenv
+.python-version
+
+# pipenv
+Pipfile.lock
+
+# Poetry
+poetry.lock
+
+# Azure/Cloud specific
+.azure/
+.aws/
+.gcp/
+
+# Security scanning
+.bandit
+safety-report.txt
+
+# MacOS
+.DS_Store

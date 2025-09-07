@@ -3,7 +3,14 @@
     "allow": [
       "WebSearch",
       "Bash(git commit:*)",
-      "Bash(pip install:*)"
+      "Bash(pip install:*)",
+      "Bash(git pull:*)",
+      "Bash(python:*)",
+      "Read(//c/Temp/PromptTest/.fyiai/cloud/sync/**)",
+      "Bash(git add:*)",
+      "Bash(git push:*)",
+      "Bash(gh pr merge:*)",
+      "Bash(git checkout:*)"
     ],
     "deny": [],
     "ask": []

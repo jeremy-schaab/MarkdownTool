@@ -1,35 +1,51 @@
 #!/usr/bin/env python3
 """
-Simple script to run the Markdown Viewer Streamlit app
+Legacy runner script for backward compatibility.
+This script now uses the new package structure.
 """
 
 import subprocess
 import sys
-import os
+import warnings
+from pathlib import Path
+
 
 def main():
-    """Run the Streamlit app"""
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    app_file = os.path.join(script_dir, "markdown_viewer.py")
+    """Main function to run the Streamlit app."""
+    warnings.warn(
+        "run_app.py is deprecated. Use 'markdown-manager' command instead.",
+        DeprecationWarning,
+        stacklevel=2
+    )
     
-    if not os.path.exists(app_file):
-        print(f"Error: {app_file} not found!")
+    # Get the path to the app file in the new structure
+    app_path = Path(__file__).parent / "src" / "markdown_manager" / "app.py"
+    
+    # Check if the app file exists
+    if not app_path.exists():
+        print(f"Error: {app_path} not found!")
+        print("Try running 'markdown-manager' command instead.")
         sys.exit(1)
     
-    print("Starting Markdown Viewer...")
-    print("Open your browser and go to: http://localhost:8501")
-    print("Press Ctrl+C to stop the application")
+    # Run the Streamlit app
+    cmd = [
+        sys.executable, "-m", "streamlit", "run", 
+        str(app_path), 
+        "--server.port", "8501"
+    ]
     
     try:
-        subprocess.run([
-            sys.executable, "-m", "streamlit", "run", 
-            app_file, "--server.port", "8501"
-        ])
+        print("🚀 Starting Markdown Manager (legacy mode)...")
+        print(f"   App will be available at: http://localhost:8501")
+        print("   Press Ctrl+C to stop the application")
+        print("   💡 Tip: Use 'markdown-manager' command for better experience")
+        subprocess.run(cmd)
     except KeyboardInterrupt:
-        print("\nApplication stopped.")
-    except FileNotFoundError:
-        print("Error: Streamlit not found. Please install it with: pip install streamlit")
+        print("\n👋 Application stopped by user")
+    except Exception as e:
+        print(f"❌ Error starting application: {e}")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()
