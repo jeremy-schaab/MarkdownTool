@@ -35,15 +35,15 @@ def main():
     ]
     
     try:
-        print("🚀 Starting Markdown Manager (legacy mode)...")
+        print("Starting Markdown Manager (legacy mode)...")
         print(f"   App will be available at: http://localhost:8501")
         print("   Press Ctrl+C to stop the application")
-        print("   💡 Tip: Use 'markdown-manager' command for better experience")
+        print("   Tip: Use 'markdown-manager' command for better experience")
         subprocess.run(cmd)
     except KeyboardInterrupt:
-        print("\n👋 Application stopped by user")
+        print("\nApplication stopped by user")
     except Exception as e:
-        print(f"❌ Error starting application: {e}")
+        print(f"Error starting application: {e}")
         sys.exit(1)
 
 

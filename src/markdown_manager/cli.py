@@ -22,17 +22,17 @@ def main():
             "--server.headless", "true"
         ]
         
-        print("🚀 Starting Markdown Manager...")
+        print("Starting Markdown Manager...")
         print(f"   Opening at: http://localhost:8501")
         print("   Press Ctrl+C to stop")
         
         subprocess.run(cmd)
         
     except KeyboardInterrupt:
-        print("\n👋 Goodbye!")
+        print("\nGoodbye!")
         sys.exit(0)
     except Exception as e:
-        print(f"❌ Error starting application: {e}")
+        print(f"Error starting application: {e}")
         sys.exit(1)
 
 
