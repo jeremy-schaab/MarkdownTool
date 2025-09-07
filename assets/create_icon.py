@@ -84,7 +84,7 @@ try:
             append_images=images[1:]
         )
         
-        print(f"✅ Created icon: {icon_path}")
+        print(f"Created icon: {icon_path}")
         print(f"   Sizes: {[img.size for img in images]}")
         
         # Also create PNG versions for other uses
@@ -92,7 +92,7 @@ try:
             png_path = icon_path.parent / f"icon_{sizes[i]}x{sizes[i]}.png"
             img.save(str(png_path), format='PNG')
         
-        print(f"✅ Created PNG versions in assets/ folder")
+        print(f"Created PNG versions in assets/ folder")
         
         return True
         
@@ -100,7 +100,7 @@ try:
         create_icon()
         
 except ImportError:
-    print("⚠️  Pillow not installed. Install with: pip install Pillow")
+    print("WARNING: Pillow not installed. Install with: pip install Pillow")
     print("   Creating simple placeholder icon instead...")
     
     # Create a very basic icon file
@@ -121,5 +121,5 @@ except ImportError:
         f.write(ico_data)
         # Add minimal bitmap data (would need proper implementation)
     
-    print("⚠️  Created minimal placeholder icon")
+    print("WARNING: Created minimal placeholder icon")
     print("   For best results, replace with a proper .ico file")

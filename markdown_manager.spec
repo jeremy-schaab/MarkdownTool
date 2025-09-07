@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 
 # Get project root
-project_root = Path(__file__).parent
+project_root = Path().absolute()
 
 # Add source directory to Python path
 sys.path.insert(0, str(project_root / "src"))
@@ -18,12 +18,12 @@ block_cipher = None
 
 # Define the main entry point
 a = Analysis(
-    ['src/markdown_manager/cli.py'],
+    ['src\\markdown_manager\\cli.py'],
     pathex=[str(project_root)],
     binaries=[],
     datas=[
         # Include all necessary data files
-        ('src/markdown_manager/*.py', 'markdown_manager'),
+        ('src\\markdown_manager\\*.py', 'markdown_manager'),
         ('.env.example', '.'),
         ('README.md', '.'),
         ('CHANGELOG.md', '.'),
@@ -125,5 +125,5 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
     version='version_info.txt',  # We'll create this file
-    icon='assets/icon.ico',  # We'll create this too
+    icon='assets\\icon.ico',  # We'll create this too
 )

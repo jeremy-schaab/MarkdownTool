@@ -44,7 +44,7 @@ def find_inno_setup():
 
 def install_inno_setup():
     """Guide user to install Inno Setup."""
-    print("🔧 Inno Setup not found!")
+    print("Inno Setup not found!")
     print("\nTo create professional installers, you need Inno Setup:")
     print("1. Download from: https://jrsoftware.org/isdl.php")
     print("2. Install Inno Setup 6")
@@ -59,48 +59,54 @@ def create_icon():
     """Create application icon if it doesn't exist."""
     icon_path = Path("assets/icon.ico")
     if icon_path.exists():
-        print("✅ Icon already exists")
+        print("Icon already exists")
         return True
     
-    print("🎨 Creating application icon...")
+    print("Creating application icon...")
     try:
         # Try to run the icon creation script
         run_command([sys.executable, "assets/create_icon.py"])
         if icon_path.exists():
-            print("✅ Icon created successfully")
+            print("Icon created successfully")
             return True
         else:
-            print("⚠️  Icon creation failed, installer will use default")
+            print("WARNING: Icon creation failed, installer will use default")
             return False
     except Exception as e:
-        print(f"⚠️  Icon creation failed: {e}")
+        print(f"WARNING: Icon creation failed: {e}")
         return False
 
 
 def build_executable():
-    """Build the executable using the existing build script."""
-    print("🚀 Building executable...")
+    """Check if executable exists or build it."""
+    print("Checking for executable...")
     
+    exe_path = Path("dist/MarkdownManager.exe")
+    if exe_path.exists():
+        print(f"Executable found: {exe_path}")
+        print(f"File size: {exe_path.stat().st_size / (1024*1024):.1f} MB")
+        return True
+    
+    print("Building executable...")
     # Run the existing build script
     try:
         run_command([sys.executable, "scripts/build_exe.py"])
         
-        exe_path = Path("dist/MarkdownManager.exe")
         if exe_path.exists():
-            print("✅ Executable built successfully")
+            print("Executable built successfully")
             return True
         else:
-            print("❌ Executable build failed")
+            print("ERROR: Executable build failed")
             return False
             
     except subprocess.CalledProcessError as e:
-        print(f"❌ Executable build failed: {e}")
+        print(f"ERROR: Executable build failed: {e}")
         return False
 
 
 def create_installer():
     """Create the installer using Inno Setup."""
-    print("📦 Creating installer...")
+    print("Creating installer...")
     
     # Find Inno Setup
     iscc_path = find_inno_setup()
@@ -112,7 +118,7 @@ def create_installer():
     # Build installer
     iss_file = Path("installer/MarkdownManager.iss")
     if not iss_file.exists():
-        print("❌ Installer script not found!")
+        print("ERROR: Installer script not found!")
         return False
     
     try:
@@ -125,37 +131,37 @@ def create_installer():
             installers = list(installer_dir.glob("*.exe"))
             if installers:
                 installer_path = installers[0]
-                print(f"✅ Installer created: {installer_path}")
-                print(f"📏 File size: {installer_path.stat().st_size / (1024*1024):.1f} MB")
+                print(f"Installer created: {installer_path}")
+                print(f"File size: {installer_path.stat().st_size / (1024*1024):.1f} MB")
                 
                 # Test installer signature (basic check)
-                print("🧪 Testing installer...")
+                print("Testing installer...")
                 try:
                     # Just check if it's a valid PE file
                     with open(installer_path, 'rb') as f:
                         header = f.read(2)
                         if header == b'MZ':
-                            print("✅ Installer appears to be valid")
+                            print("Installer appears to be valid")
                         else:
-                            print("⚠️  Installer may be corrupted")
+                            print("WARNING: Installer may be corrupted")
                 except:
-                    print("⚠️  Could not validate installer")
+                    print("WARNING: Could not validate installer")
                 
                 return True
         
-        print("❌ Installer creation failed")
+        print("ERROR: Installer creation failed")
         if result.returncode != 0:
             print(f"Inno Setup exit code: {result.returncode}")
         return False
         
     except Exception as e:
-        print(f"❌ Installer creation failed: {e}")
+        print(f"ERROR: Installer creation failed: {e}")
         return False
 
 
 def create_release_package():
     """Create a complete release package."""
-    print("📁 Creating release package...")
+    print("Creating release package...")
     
     release_dir = Path("release")
     if release_dir.exists():
@@ -169,14 +175,14 @@ def create_release_package():
         installer_src = installers[0]
         installer_dest = release_dir / installer_src.name
         shutil.copy2(installer_src, installer_dest)
-        print(f"📦 Copied installer: {installer_dest.name}")
+        print(f"Copied installer: {installer_dest.name}")
     
     # Copy standalone executable
     exe_src = Path("dist/MarkdownManager.exe")
     if exe_src.exists():
         exe_dest = release_dir / "MarkdownManager-Standalone.exe"
         shutil.copy2(exe_src, exe_dest)
-        print(f"📦 Copied standalone exe: {exe_dest.name}")
+        print(f"Copied standalone exe: {exe_dest.name}")
     
     # Copy documentation
     docs = [
@@ -191,12 +197,12 @@ def create_release_package():
         if src_path.exists():
             dest_path = release_dir / dest
             shutil.copy2(src_path, dest_path)
-            print(f"📦 Copied: {dest}")
+            print(f"Copied: {dest}")
     
     # Create release notes
     release_notes = f"""# Markdown Manager v1.2.0 - Release Package
 
-## 📦 What's Included
+## What's Included
 
 ### Professional Installer (Recommended)
 - `MarkdownManager-Setup-v1.2.0.exe` - Full installer with shortcuts and uninstaller
@@ -215,7 +221,7 @@ def create_release_package():
 - `LICENSE.txt` - MIT license terms
 - `.env.example` - Configuration template for AI features
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Option 1: Use the Installer (Recommended for most users)
 1. Download `MarkdownManager-Setup-v1.2.0.exe`
@@ -229,7 +235,7 @@ def create_release_package():
 3. Double-click to run
 4. First startup may take 15-30 seconds
 
-## 🔧 Configuration
+## Configuration
 
 ### Basic Usage
 - No configuration needed for basic markdown viewing and editing
@@ -244,89 +250,89 @@ def create_release_package():
 - Configure Azure Blob Storage connection string
 - Two-way sync between local files and cloud storage
 
-## 🆘 Support
+## Support
 
 - **Documentation**: Full README.txt included
 - **Issues**: https://github.com/jeremy-schaab/MarkdownTool/issues
 - **Updates**: https://github.com/jeremy-schaab/MarkdownTool/releases
 
-## 📊 System Requirements
+## System Requirements
 
 - Windows 7, 8, 10, or 11
 - 500MB free disk space
 - Internet connection (for AI features only)
 
 ---
-Built with ❤️ for the markdown community
+Built with love for the markdown community
 """
     
     release_notes_path = release_dir / "RELEASE-NOTES.txt"
     release_notes_path.write_text(release_notes, encoding='utf-8')
-    print(f"📦 Created: RELEASE-NOTES.txt")
+    print(f"Created: RELEASE-NOTES.txt")
     
     # Create ZIP package
     zip_name = f"MarkdownManager-v1.2.0-Complete"
-    print(f"🗜️  Creating ZIP package: {zip_name}.zip")
+    print(f"Creating ZIP package: {zip_name}.zip")
     shutil.make_archive(zip_name, 'zip', release_dir)
     
     final_zip = Path(f"{zip_name}.zip")
     if final_zip.exists():
-        print(f"✅ ZIP package created: {final_zip}")
-        print(f"📏 ZIP size: {final_zip.stat().st_size / (1024*1024):.1f} MB")
+        print(f"ZIP package created: {final_zip}")
+        print(f"ZIP size: {final_zip.stat().st_size / (1024*1024):.1f} MB")
     
     return True
 
 
 def main():
     """Main build function."""
-    print("🏗️  Markdown Manager - Professional Installer Builder")
+    print("Markdown Manager - Professional Installer Builder")
     print("=" * 60)
     
     if os.name != 'nt':
-        print("⚠️  This script is designed for Windows")
+        print("WARNING: This script is designed for Windows")
         print("    The installer will only work on Windows systems")
     
     # Step 1: Create icon
-    print("\n📍 Step 1: Create Application Icon")
+    print("\nStep 1: Create Application Icon")
     create_icon()
     
     # Step 2: Build executable
-    print("\n📍 Step 2: Build Executable")
+    print("\nStep 2: Build Executable")
     if not build_executable():
-        print("❌ Cannot continue without executable")
+        print("ERROR: Cannot continue without executable")
         sys.exit(1)
     
     # Step 3: Create installer
-    print("\n📍 Step 3: Create Professional Installer")
+    print("\nStep 3: Create Professional Installer")
     installer_created = create_installer()
     
     # Step 4: Create release package
-    print("\n📍 Step 4: Create Release Package")
+    print("\nStep 4: Create Release Package")
     create_release_package()
     
     # Summary
     print("\n" + "=" * 60)
     if installer_created:
-        print("🎉 SUCCESS! Professional installer created")
-        print("\n📦 Release Files Created:")
-        print("   • Professional Installer: installer/output/MarkdownManager-Setup-v1.2.0.exe")
-        print("   • Standalone Executable: release/MarkdownManager-Standalone.exe") 
-        print("   • Complete ZIP Package: MarkdownManager-v1.2.0-Complete.zip")
-        print("   • Documentation: release/ folder")
+        print("SUCCESS! Professional installer created")
+        print("\nRelease Files Created:")
+        print("   - Professional Installer: installer/output/MarkdownManager-Setup-v1.2.0.exe")
+        print("   - Standalone Executable: release/MarkdownManager-Standalone.exe") 
+        print("   - Complete ZIP Package: MarkdownManager-v1.2.0-Complete.zip")
+        print("   - Documentation: release/ folder")
         
-        print("\n💡 Distribution Options:")
+        print("\nDistribution Options:")
         print("   1. Share the installer exe for easy installation")
         print("   2. Share the standalone exe for portable use")
         print("   3. Share the complete ZIP for everything")
         
-        print("\n🎯 Recommended: Upload the installer to your GitHub releases!")
+        print("\nRecommended: Upload the installer to your GitHub releases!")
         
     else:
-        print("⚠️  Installer creation failed, but standalone exe is available")
-        print("   • Standalone Executable: release/MarkdownManager-Standalone.exe")
-        print("   • You can still distribute the standalone version")
+        print("WARNING: Installer creation failed, but standalone exe is available")
+        print("   - Standalone Executable: release/MarkdownManager-Standalone.exe")
+        print("   - You can still distribute the standalone version")
         
-        print("\n💡 To create professional installer:")
+        print("\nTo create professional installer:")
         print("   1. Install Inno Setup from https://jrsoftware.org/isdl.php")
         print("   2. Run this script again")
 
