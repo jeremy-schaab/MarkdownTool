@@ -46,6 +46,9 @@ build:			## Build package
 build-exe:		## Build Windows executable
 	python scripts/build_exe.py
 
+build-installer:	## Build professional Windows installer (requires Inno Setup)
+	python scripts/build_installer.py
+
 install-build:		## Install build dependencies
 	pip install -e ".[build]"
 

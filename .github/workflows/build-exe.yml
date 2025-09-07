@@ -86,49 +86,131 @@ jobs:
         }
       shell: powershell
 
+    - name: Try to create professional installer
+      run: |
+        # Try to create installer with Inno Setup
+        Write-Host "🔧 Checking for Inno Setup..."
+        
+        $innoPath = @(
+          "C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
+          "C:\Program Files\Inno Setup 6\ISCC.exe"
+        ) | Where-Object { Test-Path $_ } | Select-Object -First 1
+        
+        if ($innoPath) {
+          Write-Host "✅ Found Inno Setup: $innoPath"
+          
+          # Create icon if possible
+          try {
+            pip install Pillow
+            python assets/create_icon.py
+            Write-Host "✅ Icon created"
+          } catch {
+            Write-Host "⚠️ Could not create icon, using default"
+          }
+          
+          # Build installer
+          try {
+            & $innoPath "installer\MarkdownManager.iss"
+            if ($LASTEXITCODE -eq 0) {
+              Write-Host "✅ Professional installer created"
+              $installerCreated = $true
+            } else {
+              Write-Host "⚠️ Installer build failed"
+              $installerCreated = $false
+            }
+          } catch {
+            Write-Host "⚠️ Could not run Inno Setup"
+            $installerCreated = $false
+          }
+        } else {
+          Write-Host "⚠️ Inno Setup not found, skipping installer creation"
+          $installerCreated = $false
+        }
+      shell: powershell
+
     - name: Create release package
       run: |
         # Create release directory
         New-Item -ItemType Directory -Force -Path "release"
         
         # Copy executable
-        Copy-Item "dist\MarkdownManager.exe" "release\"
+        Copy-Item "dist\MarkdownManager.exe" "release\MarkdownManager-Standalone.exe"
         
-        # Copy installer script
+        # Copy simple installer script
         Copy-Item "dist\install.bat" "release\"
         
+        # Copy professional installer if it exists
+        if (Test-Path "installer\output\*.exe") {
+          $installer = Get-ChildItem "installer\output\*.exe" | Select-Object -First 1
+          Copy-Item $installer.FullName "release\"
+          Write-Host "📦 Copied professional installer: $($installer.Name)"
+        }
+        
         # Copy documentation
-        Copy-Item "README.md" "release\"
-        Copy-Item "CHANGELOG.md" "release\"
+        Copy-Item "README.md" "release\README.txt"
+        Copy-Item "CHANGELOG.md" "release\CHANGELOG.txt"
         Copy-Item ".env.example" "release\"
-        Copy-Item "docs\BUILDING_EXE.md" "release\"
+        Copy-Item "docs\BUILDING_EXE.md" "release\BUILDING_EXE.txt"
+        if (Test-Path "installer\LICENSE.txt") {
+          Copy-Item "installer\LICENSE.txt" "release\"
+        }
         
         # Create release notes
-        @"
-# Markdown Manager - Windows Executable
+        $hasInstaller = Test-Path "installer\output\*.exe"
+        $releaseNotes = @"
+# Markdown Manager - Windows Release
 
-## 🚀 Quick Start
-1. Download and run ``MarkdownManager.exe``
-2. (Optional) Run ``install.bat`` to create shortcuts
-3. Create a ``.env`` file with your Azure OpenAI credentials (see ``.env.example``)
+## 🚀 Quick Start Options
+
+"@
+
+        if ($hasInstaller) {
+          $installerName = (Get-ChildItem "installer\output\*.exe" | Select-Object -First 1).Name
+          $releaseNotes += @"
+### Option 1: Professional Installer (Recommended)
+1. Download and run ``$installerName``
+2. Follow the setup wizard
+3. Launch from Start Menu or Desktop shortcut
+
+"@
+        }
+
+        $releaseNotes += @"
+### Option $(if ($hasInstaller) { "2" } else { "1" }): Standalone Executable
+1. Download ``MarkdownManager-Standalone.exe``
+2. Run directly (no installation needed)
+3. (Optional) Run ``install.bat`` for shortcuts
 
 ## 📁 Files Included
-- ``MarkdownManager.exe`` - Main application
-- ``install.bat`` - Optional installer for shortcuts  
-- ``README.md`` - Full documentation
-- ``.env.example`` - Configuration template
-- ``BUILDING_EXE.md`` - Build instructions
+- ``MarkdownManager-Standalone.exe`` - Portable application
+"@
 
-## 💡 First Run
-- The first startup may take 15-30 seconds
+        if ($hasInstaller) {
+          $installerName = (Get-ChildItem "installer\output\*.exe" | Select-Object -First 1).Name
+          $releaseNotes += "`n- ``$installerName`` - Professional installer with uninstaller"
+        }
+
+        $releaseNotes += @"
+- ``install.bat`` - Simple installer for shortcuts
+- ``README.txt`` - Full documentation
+- ``.env.example`` - Configuration template
+- ``LICENSE.txt`` - License information
+
+## 💡 First Run Notes
+- First startup may take 15-30 seconds
 - Windows Defender might ask for permission
-- The app will create ``data/``, ``logs/``, and ``sessions/`` folders
+- Creates ``data/``, ``logs/``, and ``sessions/`` folders
+- For AI features, configure ``.env`` file
 
 ## 🆘 Support
 Visit: https://github.com/jeremy-schaab/MarkdownTool/issues
-"@ | Out-File -FilePath "release\README-EXECUTABLE.txt" -Encoding UTF8
+"@
+        
+        $releaseNotes | Out-File -FilePath "release\RELEASE-NOTES.txt" -Encoding UTF8
         
         Write-Host "📦 Release package created in release/ directory"
+        Write-Host "Files created:"
+        Get-ChildItem "release" | ForEach-Object { Write-Host "  - $($_.Name)" }
       shell: powershell
 
     - name: Upload build artifacts
