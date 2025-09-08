@@ -614,6 +614,8 @@ def initialize_session_state():
         st.session_state.screen_reader_optimizations = False
     if 'syntax_theme' not in st.session_state:
         st.session_state.syntax_theme = "default"
+    if 'show_settings_modal' not in st.session_state:
+        st.session_state.show_settings_modal = False
 
 def toggle_edit_mode():
     """Toggle between view and edit modes"""
@@ -1185,7 +1187,18 @@ def main():
     </style>
     """, unsafe_allow_html=True)
     
-    st.title("⚡ Markdown Manager")
+    # Header with settings icon
+    header_col1, header_col2, header_col3 = st.columns([1, 6, 1])
+    
+    with header_col1:
+        if st.button("⚙️", help="Settings", key="settings_button"):
+            st.session_state.show_settings_modal = not st.session_state.show_settings_modal
+    
+    with header_col2:
+        st.markdown("### ⚡ Markdown Manager", unsafe_allow_html=True)
+    
+    with header_col3:
+        st.write("")  # Empty column for spacing
     
     # Sidebar with file selection
     with st.sidebar:
@@ -1927,96 +1940,6 @@ def main():
                         else:
                             st.error(message)
         
-        # Settings Panel
-        st.divider()
-        with st.expander("⚙️ Settings", expanded=False):
-            st.subheader("Font Size")
-            font_size = st.slider(
-                "Font Size",
-                min_value=10,
-                max_value=24,
-                value=st.session_state.font_size,
-                step=1,
-                format="%dpx",
-                help="Adjust the font size for better readability",
-                label_visibility="collapsed"
-            )
-            if font_size != st.session_state.font_size:
-                st.session_state.font_size = font_size
-                st.rerun()
-            
-            st.subheader("Line Height")
-            line_height = st.slider(
-                "Line Height",
-                min_value=1.0,
-                max_value=3.0,
-                value=st.session_state.line_height,
-                step=0.1,
-                format="%.1f",
-                help="Adjust line spacing for comfortable reading",
-                label_visibility="collapsed"
-            )
-            if line_height != st.session_state.line_height:
-                st.session_state.line_height = line_height
-                st.rerun()
-            
-            st.subheader("Reading Width")
-            reading_width = st.slider(
-                "Reading Width",
-                min_value=600,
-                max_value=1200,
-                value=st.session_state.reading_width,
-                step=50,
-                format="%dpx",
-                help="Adjust the maximum width of text content",
-                label_visibility="collapsed"
-            )
-            if reading_width != st.session_state.reading_width:
-                st.session_state.reading_width = reading_width
-                st.rerun()
-            
-            st.subheader("Accessibility")
-            
-            high_contrast = st.checkbox(
-                "High Contrast Mode",
-                value=st.session_state.high_contrast_mode,
-                help="Enable high contrast colors for better visibility"
-            )
-            if high_contrast != st.session_state.high_contrast_mode:
-                st.session_state.high_contrast_mode = high_contrast
-                st.rerun()
-            
-            reduce_motion = st.checkbox(
-                "Reduce Motion",
-                value=st.session_state.reduce_motion,
-                help="Reduce animations and transitions"
-            )
-            if reduce_motion != st.session_state.reduce_motion:
-                st.session_state.reduce_motion = reduce_motion
-                st.rerun()
-            
-            screen_reader = st.checkbox(
-                "Screen Reader Optimizations",
-                value=st.session_state.screen_reader_optimizations,
-                help="Enable optimizations for screen readers"
-            )
-            if screen_reader != st.session_state.screen_reader_optimizations:
-                st.session_state.screen_reader_optimizations = screen_reader
-                st.rerun()
-            
-            st.subheader("🎨 Syntax Highlighting Colors")
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button("🎨 Customize Colors", use_container_width=True):
-                    st.info("Color customization coming soon!")
-                if st.button("🔄 Reset to Default", use_container_width=True):
-                    st.info("Color reset coming soon!")
-            with col2:
-                if st.button("📦 Export Scheme", use_container_width=True):
-                    st.info("Export coming soon!")
-                if st.button("📁 Import Scheme", use_container_width=True):
-                    st.info("Import coming soon!")
     
     # Main content area
     if 'selected_file' in st.session_state and os.path.exists(st.session_state.selected_file):
