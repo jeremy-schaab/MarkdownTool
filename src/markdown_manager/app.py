@@ -75,10 +75,30 @@ def save_config(project_root, doc_folder, connection_string):
 
     try:
         os.makedirs(config_dir, exist_ok=True)
+        
+        # Load existing config to preserve UI settings if they exist
+        existing_config = {}
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    existing_config = json.load(f)
+            except:
+                pass
+        
         config_data = {
             "project_root_folder": project_root,
             "project_doc_folder": doc_folder,
-            "azure_connection_string": connection_string
+            "azure_connection_string": connection_string,
+            # Preserve existing UI settings or use defaults
+            "ui_settings": existing_config.get("ui_settings", {
+                "font_size": 16,
+                "line_height": 1.7,
+                "reading_width": 800,
+                "high_contrast_mode": False,
+                "reduce_motion": False,
+                "screen_reader_optimizations": False,
+                "syntax_theme": "default"
+            })
         }
         with open(config_path, 'w', encoding='utf-8') as f:
             json.dump(config_data, f, indent=4)
@@ -87,6 +107,49 @@ def save_config(project_root, doc_folder, connection_string):
         return True
     except Exception as e:
         st.error(f"Error saving configuration: {e}")
+        return False
+
+def save_ui_settings_to_config(project_root=None):
+    """Save current UI settings to config.json"""
+    # Use project root from session state if not provided
+    if not project_root:
+        project_root = st.session_state.get('project_root_folder')
+    
+    if not project_root or not os.path.isdir(project_root):
+        # Try to use the app's current directory as fallback
+        project_root = "C:/Users/jschaab/source/repos/GitHub/MarkdownTool"
+    
+    config_dir = os.path.join(project_root, ".fyiai", "cloud", "sync")
+    config_path = os.path.join(config_dir, "config.json")
+    
+    try:
+        os.makedirs(config_dir, exist_ok=True)
+        
+        # Load existing config
+        existing_config = {}
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    existing_config = json.load(f)
+            except:
+                pass
+        
+        # Update UI settings
+        existing_config["ui_settings"] = {
+            "font_size": st.session_state.get('font_size', 16),
+            "line_height": st.session_state.get('line_height', 1.7),
+            "reading_width": st.session_state.get('reading_width', 800),
+            "high_contrast_mode": st.session_state.get('high_contrast_mode', False),
+            "reduce_motion": st.session_state.get('reduce_motion', False),
+            "screen_reader_optimizations": st.session_state.get('screen_reader_optimizations', False),
+            "syntax_theme": st.session_state.get('syntax_theme', "default")
+        }
+        
+        with open(config_path, 'w', encoding='utf-8') as f:
+            json.dump(existing_config, f, indent=4)
+        
+        return True
+    except Exception as e:
         return False
 
 def load_config(project_root):
@@ -116,6 +179,17 @@ def load_config(project_root):
         doc_folder = config_data.get("project_doc_folder", "")
         if doc_folder:
             st.session_state.last_folder_path = doc_folder
+
+        # Load UI settings if they exist
+        ui_settings = config_data.get("ui_settings", {})
+        if ui_settings:
+            st.session_state.font_size = ui_settings.get("font_size", 16)
+            st.session_state.line_height = ui_settings.get("line_height", 1.7)
+            st.session_state.reading_width = ui_settings.get("reading_width", 800)
+            st.session_state.high_contrast_mode = ui_settings.get("high_contrast_mode", False)
+            st.session_state.reduce_motion = ui_settings.get("reduce_motion", False)
+            st.session_state.screen_reader_optimizations = ui_settings.get("screen_reader_optimizations", False)
+            st.session_state.syntax_theme = ui_settings.get("syntax_theme", "default")
 
         st.session_state.config_loaded = True
         st.success("Configuration loaded successfully!")
@@ -599,7 +673,30 @@ def initialize_session_state():
     if 'ai_summary_layout' not in st.session_state:
         st.session_state.ai_summary_layout = "sidebar"  # sidebar, side-by-side, tabbed
     
-    # UI Settings session state
+    # UI Settings session state - try to load from config first
+    if 'ui_settings_loaded' not in st.session_state:
+        # Try to load UI settings from config
+        try:
+            project_root = "C:/Users/jschaab/source/repos/GitHub/MarkdownTool"
+            config_path = os.path.join(project_root, ".fyiai", "cloud", "sync", "config.json")
+            
+            if os.path.exists(config_path):
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    config_data = json.load(f)
+                ui_settings = config_data.get("ui_settings", {})
+                if ui_settings:
+                    st.session_state.font_size = ui_settings.get("font_size", 16)
+                    st.session_state.line_height = ui_settings.get("line_height", 1.7)
+                    st.session_state.reading_width = ui_settings.get("reading_width", 800)
+                    st.session_state.high_contrast_mode = ui_settings.get("high_contrast_mode", False)
+                    st.session_state.reduce_motion = ui_settings.get("reduce_motion", False)
+                    st.session_state.screen_reader_optimizations = ui_settings.get("screen_reader_optimizations", False)
+                    st.session_state.syntax_theme = ui_settings.get("syntax_theme", "default")
+        except:
+            pass
+        st.session_state.ui_settings_loaded = True
+    
+    # Set defaults if not already loaded
     if 'font_size' not in st.session_state:
         st.session_state.font_size = 16
     if 'line_height' not in st.session_state:
@@ -1145,16 +1242,22 @@ def main():
     
     st.markdown(f"""
     <style>
-    /* Reduce top and bottom padding of main content area */
+    /* Ensure header is visible with adequate top padding */
     .stMainBlockContainer.block-container.st-emotion-cache-zy6yx3.e4man114 {{
-        padding-top: 1.0rem !important;
+        padding-top: 2.5rem !important;
         padding-bottom: 0.75rem !important;
     }}
     
     /* Alternative selectors in case the class names change */
     .stMainBlockContainer, .block-container {{
-        padding-top: 1.0rem !important;
+        padding-top: 2.5rem !important;
         padding-bottom: 0.75rem !important;
+    }}
+    
+    /* Header styling for better visibility */
+    .stColumns {{
+        margin-top: 0 !important;
+        margin-bottom: 1rem !important;
     }}
     
     /* Ensure app body can extend closer to viewport bottom */
@@ -1223,6 +1326,7 @@ def main():
                 )
                 if font_size != st.session_state.font_size:
                     st.session_state.font_size = font_size
+                    save_ui_settings_to_config()
                     st.rerun()
                 
                 line_height = st.slider(
@@ -1237,6 +1341,7 @@ def main():
                 )
                 if line_height != st.session_state.line_height:
                     st.session_state.line_height = line_height
+                    save_ui_settings_to_config()
                     st.rerun()
                 
                 reading_width = st.slider(
@@ -1251,6 +1356,7 @@ def main():
                 )
                 if reading_width != st.session_state.reading_width:
                     st.session_state.reading_width = reading_width
+                    save_ui_settings_to_config()
                     st.rerun()
             
             with settings_col2:
@@ -1264,6 +1370,7 @@ def main():
                 )
                 if high_contrast != st.session_state.high_contrast_mode:
                     st.session_state.high_contrast_mode = high_contrast
+                    save_ui_settings_to_config()
                     st.rerun()
                 
                 reduce_motion = st.checkbox(
@@ -1274,6 +1381,7 @@ def main():
                 )
                 if reduce_motion != st.session_state.reduce_motion:
                     st.session_state.reduce_motion = reduce_motion
+                    save_ui_settings_to_config()
                     st.rerun()
                 
                 screen_reader = st.checkbox(
@@ -1284,6 +1392,7 @@ def main():
                 )
                 if screen_reader != st.session_state.screen_reader_optimizations:
                     st.session_state.screen_reader_optimizations = screen_reader
+                    save_ui_settings_to_config()
                     st.rerun()
             
             with settings_col3:
