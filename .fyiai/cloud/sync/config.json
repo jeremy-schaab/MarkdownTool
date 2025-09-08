@@ -1,0 +1,14 @@
+{
+    "project_root_folder": "C:/Users/jschaab/source/repos/GitHub/MarkdownTool",
+    "project_doc_folder": "",
+    "azure_connection_string": "",
+    "ui_settings": {
+        "font_size": 18,
+        "line_height": 1.8,
+        "reading_width": 900,
+        "high_contrast_mode": true,
+        "reduce_motion": false,
+        "screen_reader_optimizations": false,
+        "syntax_theme": "default"
+    }
+}

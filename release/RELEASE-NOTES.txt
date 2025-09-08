@@ -1,0 +1,64 @@
+# Markdown Manager v1.2.0 - Release Package
+
+## What's Included
+
+### Professional Installer (Recommended)
+- `MarkdownManager-Setup-v1.2.0.exe` - Full installer with shortcuts and uninstaller
+- Installs to Program Files with Start Menu integration
+- Includes all documentation and sample files
+- Optional desktop shortcut and PATH integration
+
+### Standalone Executable  
+- `MarkdownManager-Standalone.exe` - Portable version, no installation needed
+- Just download and run, no admin rights required
+- All features included in single file
+
+### Documentation
+- `README.txt` - Complete user guide and feature documentation
+- `CHANGELOG.txt` - Version history and updates
+- `LICENSE.txt` - MIT license terms
+- `.env.example` - Configuration template for AI features
+
+## Quick Start
+
+### Option 1: Use the Installer (Recommended for most users)
+1. Download `MarkdownManager-Setup-v1.2.0.exe`
+2. Run the installer (Windows may ask for permission)
+3. Follow the setup wizard
+4. Launch from Start Menu or Desktop shortcut
+
+### Option 2: Use Standalone Version
+1. Download `MarkdownManager-Standalone.exe`
+2. Save to desired folder
+3. Double-click to run
+4. First startup may take 15-30 seconds
+
+## Configuration
+
+### Basic Usage
+- No configuration needed for basic markdown viewing and editing
+- Sample files included for testing
+
+### AI Features (Optional)
+1. Create `.env` file using the provided template
+2. Add your Azure OpenAI credentials
+3. Restart the application
+
+### Cloud Sync (Optional)
+- Configure Azure Blob Storage connection string
+- Two-way sync between local files and cloud storage
+
+## Support
+
+- **Documentation**: Full README.txt included
+- **Issues**: https://github.com/jeremy-schaab/MarkdownTool/issues
+- **Updates**: https://github.com/jeremy-schaab/MarkdownTool/releases
+
+## System Requirements
+
+- Windows 7, 8, 10, or 11
+- 500MB free disk space
+- Internet connection (for AI features only)
+
+---
+Built with love for the markdown community

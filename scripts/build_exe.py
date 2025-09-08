@@ -36,21 +36,21 @@ def install_pyinstaller():
     """Install PyInstaller if not already installed."""
     try:
         import PyInstaller
-        print("✅ PyInstaller already installed")
+        print("PyInstaller already installed")
     except ImportError:
-        print("📦 Installing PyInstaller...")
+        print("Installing PyInstaller...")
         run_command([sys.executable, "-m", "pip", "install", "pyinstaller"])
 
 
 def build_executable():
     """Build the Windows executable."""
-    print("🚀 Building Markdown Manager executable...")
+    print("Building Markdown Manager executable...")
     
     # Clean previous builds
     build_dirs = ["build", "dist"]
     for dir_name in build_dirs:
         if Path(dir_name).exists():
-            print(f"🧹 Cleaning {dir_name}/")
+            print(f"Cleaning {dir_name}/")
             shutil.rmtree(dir_name)
     
     # Check for icon
@@ -61,7 +61,7 @@ def build_executable():
     if not has_icon:
         spec_content = spec_content.replace("icon='assets/icon.ico',", "# icon='assets/icon.ico',")
         Path("markdown_manager.spec").write_text(spec_content)
-        print("⚠️  Building without icon (you can add assets/icon.ico later)")
+        print("WARNING: Building without icon (you can add assets/icon.ico later)")
     
     # Build with PyInstaller
     try:
@@ -70,27 +70,27 @@ def build_executable():
         # Check if build was successful
         exe_path = Path("dist/MarkdownManager.exe")
         if exe_path.exists():
-            print(f"✅ Build successful!")
-            print(f"📁 Executable created: {exe_path.absolute()}")
-            print(f"📏 File size: {exe_path.stat().st_size / (1024*1024):.1f} MB")
+            print(f"Build successful!")
+            print(f"Executable created: {exe_path.absolute()}")
+            print(f"File size: {exe_path.stat().st_size / (1024*1024):.1f} MB")
             
             # Test the executable
-            print("🧪 Testing executable...")
+            print("Testing executable...")
             try:
                 result = run_command([str(exe_path), "--help"], check=False)
                 if result.returncode == 0:
-                    print("✅ Executable test passed")
+                    print("Executable test passed")
                 else:
-                    print("⚠️  Executable test failed, but file was created")
+                    print("WARNING: Executable test failed, but file was created")
             except Exception as e:
-                print(f"⚠️  Could not test executable: {e}")
+                print(f"WARNING: Could not test executable: {e}")
                 
         else:
-            print("❌ Build failed - executable not found")
+            print("ERROR: Build failed - executable not found")
             return False
             
     except subprocess.CalledProcessError as e:
-        print(f"❌ Build failed: {e}")
+        print(f"ERROR: Build failed: {e}")
         return False
     
     return True
@@ -129,29 +129,29 @@ pause
     
     installer_path = Path("dist/install.bat")
     installer_path.write_text(installer_content)
-    print(f"📦 Created installer script: {installer_path}")
+    print(f"Created installer script: {installer_path}")
 
 
 def main():
     """Main build function."""
-    print("🏗️  Markdown Manager - Windows Executable Builder")
+    print("Markdown Manager - Windows Executable Builder")
     print("=" * 50)
     
     # Check if we're on Windows
     if os.name != 'nt':
-        print("⚠️  This script is designed for Windows. You can still build, but the executable will be for the current platform.")
+        print("WARNING: This script is designed for Windows. You can still build, but the executable will be for the current platform.")
     
     # Install PyInstaller
     install_pyinstaller()
     
     # Build executable
     if build_executable():
-        print("\n🎉 Build completed successfully!")
-        print("\n📋 Next steps:")
+        print("\nBuild completed successfully!")
+        print("\nNext steps:")
         print("   1. Test the executable: dist/MarkdownManager.exe")
         print("   2. Run installer: dist/install.bat (optional)")
         print("   3. Distribute the dist/ folder or just the .exe file")
-        print("\n💡 Tips:")
+        print("\nTips:")
         print("   - Add assets/icon.ico for a custom icon")
         print("   - The first run may be slower as it extracts files")
         print("   - Include .env.example for users to configure AI features")
@@ -160,7 +160,7 @@ def main():
         create_installer_script()
         
     else:
-        print("\n❌ Build failed!")
+        print("\nBuild failed!")
         print("Check the error messages above and try again.")
         sys.exit(1)
 

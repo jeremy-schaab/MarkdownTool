@@ -75,10 +75,30 @@ def save_config(project_root, doc_folder, connection_string):
 
     try:
         os.makedirs(config_dir, exist_ok=True)
+        
+        # Load existing config to preserve UI settings if they exist
+        existing_config = {}
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    existing_config = json.load(f)
+            except:
+                pass
+        
         config_data = {
             "project_root_folder": project_root,
             "project_doc_folder": doc_folder,
-            "azure_connection_string": connection_string
+            "azure_connection_string": connection_string,
+            # Preserve existing UI settings or use defaults
+            "ui_settings": existing_config.get("ui_settings", {
+                "font_size": 16,
+                "line_height": 1.7,
+                "reading_width": 800,
+                "high_contrast_mode": False,
+                "reduce_motion": False,
+                "screen_reader_optimizations": False,
+                "syntax_theme": "default"
+            })
         }
         with open(config_path, 'w', encoding='utf-8') as f:
             json.dump(config_data, f, indent=4)
@@ -87,6 +107,49 @@ def save_config(project_root, doc_folder, connection_string):
         return True
     except Exception as e:
         st.error(f"Error saving configuration: {e}")
+        return False
+
+def save_ui_settings_to_config(project_root=None):
+    """Save current UI settings to config.json"""
+    # Use project root from session state if not provided
+    if not project_root:
+        project_root = st.session_state.get('project_root_folder')
+    
+    if not project_root or not os.path.isdir(project_root):
+        # Try to use the app's current directory as fallback
+        project_root = "C:/Users/jschaab/source/repos/GitHub/MarkdownTool"
+    
+    config_dir = os.path.join(project_root, ".fyiai", "cloud", "sync")
+    config_path = os.path.join(config_dir, "config.json")
+    
+    try:
+        os.makedirs(config_dir, exist_ok=True)
+        
+        # Load existing config
+        existing_config = {}
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    existing_config = json.load(f)
+            except:
+                pass
+        
+        # Update UI settings
+        existing_config["ui_settings"] = {
+            "font_size": st.session_state.get('font_size', 16),
+            "line_height": st.session_state.get('line_height', 1.7),
+            "reading_width": st.session_state.get('reading_width', 800),
+            "high_contrast_mode": st.session_state.get('high_contrast_mode', False),
+            "reduce_motion": st.session_state.get('reduce_motion', False),
+            "screen_reader_optimizations": st.session_state.get('screen_reader_optimizations', False),
+            "syntax_theme": st.session_state.get('syntax_theme', "default")
+        }
+        
+        with open(config_path, 'w', encoding='utf-8') as f:
+            json.dump(existing_config, f, indent=4)
+        
+        return True
+    except Exception as e:
         return False
 
 def load_config(project_root):
@@ -116,6 +179,17 @@ def load_config(project_root):
         doc_folder = config_data.get("project_doc_folder", "")
         if doc_folder:
             st.session_state.last_folder_path = doc_folder
+
+        # Load UI settings if they exist
+        ui_settings = config_data.get("ui_settings", {})
+        if ui_settings:
+            st.session_state.font_size = ui_settings.get("font_size", 16)
+            st.session_state.line_height = ui_settings.get("line_height", 1.7)
+            st.session_state.reading_width = ui_settings.get("reading_width", 800)
+            st.session_state.high_contrast_mode = ui_settings.get("high_contrast_mode", False)
+            st.session_state.reduce_motion = ui_settings.get("reduce_motion", False)
+            st.session_state.screen_reader_optimizations = ui_settings.get("screen_reader_optimizations", False)
+            st.session_state.syntax_theme = ui_settings.get("syntax_theme", "default")
 
         st.session_state.config_loaded = True
         st.success("Configuration loaded successfully!")
@@ -598,6 +672,47 @@ def initialize_session_state():
         st.session_state.ai_summary_tokens = None
     if 'ai_summary_layout' not in st.session_state:
         st.session_state.ai_summary_layout = "sidebar"  # sidebar, side-by-side, tabbed
+    
+    # UI Settings session state - try to load from config first
+    if 'ui_settings_loaded' not in st.session_state:
+        # Try to load UI settings from config
+        try:
+            project_root = "C:/Users/jschaab/source/repos/GitHub/MarkdownTool"
+            config_path = os.path.join(project_root, ".fyiai", "cloud", "sync", "config.json")
+            
+            if os.path.exists(config_path):
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    config_data = json.load(f)
+                ui_settings = config_data.get("ui_settings", {})
+                if ui_settings:
+                    st.session_state.font_size = ui_settings.get("font_size", 16)
+                    st.session_state.line_height = ui_settings.get("line_height", 1.7)
+                    st.session_state.reading_width = ui_settings.get("reading_width", 800)
+                    st.session_state.high_contrast_mode = ui_settings.get("high_contrast_mode", False)
+                    st.session_state.reduce_motion = ui_settings.get("reduce_motion", False)
+                    st.session_state.screen_reader_optimizations = ui_settings.get("screen_reader_optimizations", False)
+                    st.session_state.syntax_theme = ui_settings.get("syntax_theme", "default")
+        except:
+            pass
+        st.session_state.ui_settings_loaded = True
+    
+    # Set defaults if not already loaded
+    if 'font_size' not in st.session_state:
+        st.session_state.font_size = 16
+    if 'line_height' not in st.session_state:
+        st.session_state.line_height = 1.7
+    if 'reading_width' not in st.session_state:
+        st.session_state.reading_width = 800
+    if 'high_contrast_mode' not in st.session_state:
+        st.session_state.high_contrast_mode = False
+    if 'reduce_motion' not in st.session_state:
+        st.session_state.reduce_motion = False
+    if 'screen_reader_optimizations' not in st.session_state:
+        st.session_state.screen_reader_optimizations = False
+    if 'syntax_theme' not in st.session_state:
+        st.session_state.syntax_theme = "default"
+    if 'show_settings_modal' not in st.session_state:
+        st.session_state.show_settings_modal = False
 
 def toggle_edit_mode():
     """Toggle between view and edit modes"""
@@ -685,32 +800,58 @@ def render_markdown_component(html_content, selected_file_path):
     # Get the base directory for resolving relative links
     base_dir = os.path.dirname(selected_file_path)
     
+    # Get user settings from session state
+    font_size = st.session_state.get('font_size', 16)
+    line_height = st.session_state.get('line_height', 1.7)
+    reading_width = st.session_state.get('reading_width', 800)
+    high_contrast = st.session_state.get('high_contrast_mode', False)
+    
+    # Dynamic styling based on user preferences
+    bg_color = "#000000" if high_contrast else "#ffffff"
+    text_color = "#ffffff" if high_contrast else "#333"
+    heading_color = "#ffffff" if high_contrast else "#1f2937"
+    code_bg = "#333333" if high_contrast else "#f8f9fa"
+    code_border = "#555555" if high_contrast else "#e9ecef"
+    table_bg = "#1a1a1a" if high_contrast else "#f2f2f2"
+    table_border = "#555555" if high_contrast else "#ddd"
+    
     full_html = f'''
-<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: {reading_width}px; margin: 0 auto; background-color: {bg_color};">
     <style>
         .markdown-content {{
-            line-height: 1.6;
-            font-size: 16px;
-            color: #333;
+            line-height: {line_height};
+            font-size: {font_size}px;
+            color: {text_color};
+            max-width: {reading_width}px;
+            margin: 0 auto;
+            background-color: {bg_color};
         }}
-        .markdown-content h1, .markdown-content h2, .markdown-content h3 {{
+        .markdown-content h1, .markdown-content h2, .markdown-content h3, 
+        .markdown-content h4, .markdown-content h5, .markdown-content h6 {{
             margin-top: 1.5em;
             margin-bottom: 0.5em;
-            color: #1f2937;
+            color: {heading_color};
+            font-size: {font_size * 1.2}px;
+            line-height: {line_height};
+        }}
+        .markdown-content p, .markdown-content li {{
+            font-size: {font_size}px;
+            line-height: {line_height};
         }}
         .markdown-content pre {{
-            background-color: #f8f9fa;
-            border: 1px solid #e9ecef;
+            background-color: {code_bg};
+            border: 1px solid {code_border};
             border-radius: 4px;
             padding: 1rem;
             overflow-x: auto;
             margin: 1em 0;
         }}
         .markdown-content code {{
-            background-color: #f8f9fa;
+            background-color: {code_bg};
+            color: {text_color};
             padding: 0.2em 0.4em;
             border-radius: 3px;
-            font-size: 0.9em;
+            font-size: {font_size * 0.9}px;
             font-family: 'Monaco', 'Consolas', 'Courier New', monospace;
         }}
         .markdown-content pre code {{
@@ -723,12 +864,13 @@ def render_markdown_component(html_content, selected_file_path):
             margin: 1em 0;
         }}
         .markdown-content th, .markdown-content td {{
-            border: 1px solid #ddd;
+            border: 1px solid {table_border};
             padding: 8px 12px;
             text-align: left;
+            color: {text_color};
         }}
         .markdown-content th {{
-            background-color: #f2f2f2;
+            background-color: {table_bg};
             font-weight: bold;
         }}
         .highlight {{
@@ -1056,27 +1198,223 @@ def main():
                 del st.query_params['navigate_to']
             st.rerun()
     
-    # Custom CSS to reduce top padding
-    st.markdown("""
+    # Dynamic CSS based on user settings
+    high_contrast_css = ""
+    if st.session_state.high_contrast_mode:
+        high_contrast_css = """
+        /* High contrast mode styles */
+        .stApp {
+            background-color: #000000 !important;
+            color: #ffffff !important;
+        }
+        .stSidebar {
+            background-color: #1a1a1a !important;
+        }
+        .stMarkdown {
+            color: #ffffff !important;
+        }
+        """
+    
+    reduce_motion_css = ""
+    if st.session_state.reduce_motion:
+        reduce_motion_css = """
+        /* Reduce motion styles */
+        * {
+            animation-duration: 0.001ms !important;
+            transition-duration: 0.001ms !important;
+            animation-iteration-count: 1 !important;
+        }
+        """
+    
+    screen_reader_css = ""
+    if st.session_state.screen_reader_optimizations:
+        screen_reader_css = """
+        /* Screen reader optimizations */
+        .stApp {
+            font-family: 'Arial', 'Helvetica', sans-serif !important;
+        }
+        /* Add focus indicators */
+        button:focus, input:focus, textarea:focus, select:focus {
+            outline: 3px solid #005fcc !important;
+            outline-offset: 2px !important;
+        }
+        """
+    
+    st.markdown(f"""
     <style>
-    /* Reduce top and bottom padding of main content area */
-    .stMainBlockContainer.block-container.st-emotion-cache-zy6yx3.e4man114 {
-        padding-top: 1.0rem !important;
+    /* Ensure header is visible with adequate top padding */
+    .stMainBlockContainer.block-container.st-emotion-cache-zy6yx3.e4man114 {{
+        padding-top: 2.5rem !important;
         padding-bottom: 0.75rem !important;
-    }
+    }}
     
     /* Alternative selectors in case the class names change */
-    .stMainBlockContainer, .block-container {
-        padding-top: 1.0rem !important;
+    .stMainBlockContainer, .block-container {{
+        padding-top: 2.5rem !important;
         padding-bottom: 0.75rem !important;
-    }
+    }}
+    
+    /* Header styling for better visibility */
+    .stColumns {{
+        margin-top: 0 !important;
+        margin-bottom: 1rem !important;
+    }}
     
     /* Ensure app body can extend closer to viewport bottom */
-    main .block-container { min-height: calc(100vh - 200px); }
+    main .block-container {{ min-height: calc(100vh - 200px); }}
+    
+    /* Dynamic font size and reading settings */
+    .main-content {{
+        font-size: {st.session_state.font_size}px !important;
+        line-height: {st.session_state.line_height} !important;
+        max-width: {st.session_state.reading_width}px !important;
+        margin: 0 auto !important;
+    }}
+    
+    /* Apply settings to markdown content */
+    .stMarkdown p, .stMarkdown h1, .stMarkdown h2, .stMarkdown h3, .stMarkdown h4, .stMarkdown h5, .stMarkdown h6,
+    .stMarkdown li, .stMarkdown blockquote {{
+        font-size: {st.session_state.font_size}px !important;
+        line-height: {st.session_state.line_height} !important;
+    }}
+    
+    /* Apply max width to main content areas */
+    .main-content-area {{
+        max-width: {st.session_state.reading_width}px !important;
+        margin: 0 auto !important;
+    }}
+    
+    {high_contrast_css}
+    {reduce_motion_css}
+    {screen_reader_css}
     </style>
     """, unsafe_allow_html=True)
     
-    st.title("⚡ Markdown Manager")
+    # Header with settings icon
+    header_col1, header_col2, header_col3 = st.columns([1, 6, 1])
+    
+    with header_col1:
+        if st.button("⚙️", help="Settings", key="settings_button"):
+            st.session_state.show_settings_modal = not st.session_state.show_settings_modal
+    
+    with header_col2:
+        st.markdown("### ⚡ Markdown Manager", unsafe_allow_html=True)
+    
+    with header_col3:
+        st.write("")  # Empty column for spacing
+    
+    # Settings Modal
+    if st.session_state.show_settings_modal:
+        with st.container():
+            st.markdown("---")
+            st.subheader("⚙️ Settings")
+            
+            # Create columns for settings layout
+            settings_col1, settings_col2, settings_col3 = st.columns([1, 1, 1])
+            
+            with settings_col1:
+                st.markdown("**Typography**")
+                font_size = st.slider(
+                    "Font Size",
+                    min_value=10,
+                    max_value=24,
+                    value=st.session_state.font_size,
+                    step=1,
+                    format="%dpx",
+                    help="Adjust the font size for better readability",
+                    key="modal_font_size"
+                )
+                if font_size != st.session_state.font_size:
+                    st.session_state.font_size = font_size
+                    save_ui_settings_to_config()
+                    st.rerun()
+                
+                line_height = st.slider(
+                    "Line Height",
+                    min_value=1.0,
+                    max_value=3.0,
+                    value=st.session_state.line_height,
+                    step=0.1,
+                    format="%.1f",
+                    help="Adjust line spacing for comfortable reading",
+                    key="modal_line_height"
+                )
+                if line_height != st.session_state.line_height:
+                    st.session_state.line_height = line_height
+                    save_ui_settings_to_config()
+                    st.rerun()
+                
+                reading_width = st.slider(
+                    "Reading Width",
+                    min_value=600,
+                    max_value=1200,
+                    value=st.session_state.reading_width,
+                    step=50,
+                    format="%dpx",
+                    help="Adjust the maximum width of text content",
+                    key="modal_reading_width"
+                )
+                if reading_width != st.session_state.reading_width:
+                    st.session_state.reading_width = reading_width
+                    save_ui_settings_to_config()
+                    st.rerun()
+            
+            with settings_col2:
+                st.markdown("**Accessibility**")
+                
+                high_contrast = st.checkbox(
+                    "High Contrast Mode",
+                    value=st.session_state.high_contrast_mode,
+                    help="Enable high contrast colors for better visibility",
+                    key="modal_high_contrast"
+                )
+                if high_contrast != st.session_state.high_contrast_mode:
+                    st.session_state.high_contrast_mode = high_contrast
+                    save_ui_settings_to_config()
+                    st.rerun()
+                
+                reduce_motion = st.checkbox(
+                    "Reduce Motion",
+                    value=st.session_state.reduce_motion,
+                    help="Reduce animations and transitions",
+                    key="modal_reduce_motion"
+                )
+                if reduce_motion != st.session_state.reduce_motion:
+                    st.session_state.reduce_motion = reduce_motion
+                    save_ui_settings_to_config()
+                    st.rerun()
+                
+                screen_reader = st.checkbox(
+                    "Screen Reader Optimizations",
+                    value=st.session_state.screen_reader_optimizations,
+                    help="Enable optimizations for screen readers",
+                    key="modal_screen_reader"
+                )
+                if screen_reader != st.session_state.screen_reader_optimizations:
+                    st.session_state.screen_reader_optimizations = screen_reader
+                    save_ui_settings_to_config()
+                    st.rerun()
+            
+            with settings_col3:
+                st.markdown("**🎨 Syntax Highlighting**")
+                
+                if st.button("🎨 Customize Colors", use_container_width=True, key="modal_customize"):
+                    st.info("Color customization coming soon!")
+                if st.button("🔄 Reset to Default", use_container_width=True, key="modal_reset"):
+                    st.info("Color reset coming soon!")
+                if st.button("📦 Export Scheme", use_container_width=True, key="modal_export"):
+                    st.info("Export coming soon!")
+                if st.button("📁 Import Scheme", use_container_width=True, key="modal_import"):
+                    st.info("Import coming soon!")
+            
+            # Close settings button
+            col_close1, col_close2, col_close3 = st.columns([2, 1, 2])
+            with col_close2:
+                if st.button("❌ Close Settings", type="primary", use_container_width=True):
+                    st.session_state.show_settings_modal = False
+                    st.rerun()
+            
+            st.markdown("---")
     
     # Sidebar with file selection
     with st.sidebar:
@@ -1817,6 +2155,7 @@ def main():
                             st.success(message)
                         else:
                             st.error(message)
+        
     
     # Main content area
     if 'selected_file' in st.session_state and os.path.exists(st.session_state.selected_file):

@@ -1,0 +1,59 @@
+======================================================================
+                    MARKDOWN MANAGER INSTALLATION COMPLETE
+======================================================================
+
+Congratulations! Markdown Manager has been successfully installed.
+
+GETTING STARTED
+--------------
+✓ Launch Markdown Manager from the Start Menu or Desktop shortcut
+✓ The application will open in your web browser at http://localhost:8501
+✓ Try the sample files in the "Test Files" folder to get familiar
+
+NEXT STEPS
+----------
+1. CONFIGURE AI FEATURES (Optional but Recommended)
+   • Open the .env.example file (shortcut in Start Menu)
+   • Copy it to .env and add your Azure OpenAI credentials
+   • Restart the application to enable AI summarization
+
+2. EXPLORE FEATURES
+   • Browse local markdown files from the sidebar
+   • Upload documents for quick viewing
+   • Try the editing features with live preview
+   • Test internal link navigation between files
+
+3. CUSTOMIZE YOUR EXPERIENCE
+   • Set your default folder paths
+   • Configure cloud sync with Azure Blob Storage
+   • Explore different summary templates for AI features
+
+IMPORTANT NOTES
+--------------
+• First startup may take 15-30 seconds as files are initialized
+• Windows Defender may ask for permission - this is normal
+• The application runs locally and your data stays on your computer
+• Internet connection required only for AI features and updates
+
+INSTALLED LOCATIONS
+------------------
+• Application: C:\Program Files\Markdown Manager\
+• Test Files: Start Menu > Markdown Manager > Test Files
+• Documentation: Start Menu > Markdown Manager > Documentation
+• Configuration: Start Menu > Markdown Manager > Configuration
+
+SUPPORT
+-------
+• Need help? Check the documentation or visit:
+  https://github.com/jeremy-schaab/MarkdownTool
+• Report bugs or request features:
+  https://github.com/jeremy-schaab/MarkdownTool/issues
+
+THANK YOU!
+---------
+Thank you for installing Markdown Manager. We hope you enjoy using 
+this powerful tool for all your markdown document needs!
+
+Happy writing! 📝
+
+======================================================================
