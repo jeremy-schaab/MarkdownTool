@@ -8,25 +8,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Standalone executable support with PyInstaller
+- .claude and .fyiai directory structure for AI workflow integration
+- Enhanced gitignore for development artifacts
+
+### Changed
+- Updated documentation to reflect production-grade structure
+- Improved CLI entry point with better error handling
+
+## [1.2.0] - 2024-09-07
+
+### Added
 - Production-grade project structure with `src/` layout
 - Comprehensive development tooling and CI/CD setup
 - CLI entry point via `markdown-manager` command
-- Configuration management system
-- Enhanced testing framework with pytest
-- Pre-commit hooks for code quality
-- API documentation structure
-- Contributing guidelines
-- Docker support for containerized deployments
+- Configuration management system in `config/` directory
+- Enhanced testing framework with pytest and fixtures
+- Pre-commit hooks for code quality automation
+- API documentation structure in `docs/`
+- Contributing guidelines with development workflow
+- Docker and Kubernetes support for containerized deployments
+- Makefile for common development tasks
+- Professional PyInstaller executable build system
 
 ### Changed
-- Reorganized codebase into proper Python package structure
-- Updated dependencies with version pinning
-- Improved error handling and logging
-- Enhanced documentation with deployment guides
+- Reorganized codebase into proper Python package structure under `src/markdown_manager/`
+- Moved main application from `markdown_viewer.py` to `src/markdown_manager/app.py`
+- Updated dependencies with version pinning in requirements files
+- Improved error handling and logging throughout the application
+- Enhanced documentation with comprehensive deployment guides
+- Modernized build system using `pyproject.toml` instead of legacy `setup.py`
 
 ### Fixed
-- Project structure for better maintainability
-- Import paths after restructuring
+- Project structure for better maintainability and standards compliance
+- Import paths after major restructuring
+- Backward compatibility with existing user workflows
+- Package discovery and installation issues
 
 ## [1.1.0] - 2024-09-05
 

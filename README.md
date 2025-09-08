@@ -1,6 +1,6 @@
-# 📄 Markdown Viewer, Editor & AI Summarizer
+# 📄 Markdown Manager - Professional Markdown Tool
 
-A powerful, web-based markdown file viewer, editor, and AI-powered summarization tool built with Streamlit. Browse local folders, upload files, edit markdown documents with real-time preview, and generate intelligent summaries using GPT-5 Mini.
+A production-grade, web-based markdown file viewer, editor, and AI-powered summarization tool built with Streamlit. Features local folder browsing, file upload, real-time editing with preview, Azure Blob Storage synchronization, and intelligent summaries using GPT-5 Mini.
 
 ## ✨ Features
 
@@ -46,7 +46,7 @@ A powerful, web-based markdown file viewer, editor, and AI-powered summarization
 ## 🚀 Installation
 
 ### Prerequisites
-- Python 3.7 or higher
+- Python 3.8 or higher
 - pip (Python package installer)
 
 ### Quick Setup
@@ -57,19 +57,26 @@ A powerful, web-based markdown file viewer, editor, and AI-powered summarization
    cd MarkdownTool
    ```
 
-2. **Install dependencies**
+2. **Install the package** (Recommended)
    ```bash
-   pip install -r requirements.txt
-   ```
-
-3. **Run the application**
-   ```bash
-   python run_app.py
+   pip install -e .
+   markdown-manager
    ```
    
-   Or run directly with Streamlit:
+   Or install dependencies manually:
    ```bash
-   python -m streamlit run markdown_viewer.py
+   pip install -r requirements.txt
+   python run_app.py
+   ```
+
+3. **Alternative: Direct CLI usage**
+   ```bash
+   python src/markdown_manager/cli.py
+   ```
+   
+   Or run the Streamlit app directly:
+   ```bash
+   python -m streamlit run src/markdown_manager/app.py
    ```
 
 4. **Open your browser**
@@ -112,8 +119,9 @@ The application requires the following Python packages:
 - `openai` - Azure OpenAI integration for AI summarization
 - `python-dotenv` - Environment variable management for secure configuration
 - `azure-storage-blob` - Client library for Azure Blob Storage synchronization
+- `click` - Command-line interface framework for the CLI entry point
 
-Full requirements are listed in `requirements.txt`.
+Full requirements are listed in `requirements.txt` and `requirements-dev.txt`.
 
 ## 🎯 Usage
 
@@ -206,7 +214,25 @@ Full requirements are listed in `requirements.txt`.
 ### Custom Port
 To run on a different port:
 ```bash
-python -m streamlit run markdown_viewer.py --server.port 8502
+python -m streamlit run src/markdown_manager/app.py --server.port 8502
+```
+
+### Development Setup
+For development work:
+```bash
+# Install development dependencies
+pip install -r requirements-dev.txt
+
+# Run with development tools
+make install-dev
+make run-dev
+
+# Run tests
+make test
+
+# Format and lint code
+make format
+make lint
 ```
 
 ### Azure OpenAI Configuration
@@ -337,10 +363,28 @@ Contributions are welcome! Please feel free to submit a Pull Request. For major 
 
 ### Development Setup
 1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
+2. Clone your fork and setup development environment:
+   ```bash
+   git clone https://github.com/your-username/MarkdownTool.git
+   cd MarkdownTool
+   pip install -e ".[dev]"
+   ```
+3. Install pre-commit hooks: `pre-commit install`
+4. Create a feature branch: `git checkout -b feature/your-feature`
+5. Make your changes and run tests: `make test`
+6. Ensure code quality: `make lint && make format`
+7. Submit a pull request
+
+### Project Structure
+This project follows a modern Python package structure:
+- `src/markdown_manager/` - Main application package
+- `tests/` - Test suite with pytest
+- `docs/` - Documentation
+- `config/` - Configuration management
+- `scripts/` - Utility scripts
+- `deployment/` - Deployment configurations
+
+See [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) for detailed information.
 
 ## 📄 License
 
