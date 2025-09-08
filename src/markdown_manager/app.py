@@ -598,6 +598,22 @@ def initialize_session_state():
         st.session_state.ai_summary_tokens = None
     if 'ai_summary_layout' not in st.session_state:
         st.session_state.ai_summary_layout = "sidebar"  # sidebar, side-by-side, tabbed
+    
+    # UI Settings session state
+    if 'font_size' not in st.session_state:
+        st.session_state.font_size = 16
+    if 'line_height' not in st.session_state:
+        st.session_state.line_height = 1.7
+    if 'reading_width' not in st.session_state:
+        st.session_state.reading_width = 800
+    if 'high_contrast_mode' not in st.session_state:
+        st.session_state.high_contrast_mode = False
+    if 'reduce_motion' not in st.session_state:
+        st.session_state.reduce_motion = False
+    if 'screen_reader_optimizations' not in st.session_state:
+        st.session_state.screen_reader_optimizations = False
+    if 'syntax_theme' not in st.session_state:
+        st.session_state.syntax_theme = "default"
 
 def toggle_edit_mode():
     """Toggle between view and edit modes"""
@@ -685,32 +701,58 @@ def render_markdown_component(html_content, selected_file_path):
     # Get the base directory for resolving relative links
     base_dir = os.path.dirname(selected_file_path)
     
+    # Get user settings from session state
+    font_size = st.session_state.get('font_size', 16)
+    line_height = st.session_state.get('line_height', 1.7)
+    reading_width = st.session_state.get('reading_width', 800)
+    high_contrast = st.session_state.get('high_contrast_mode', False)
+    
+    # Dynamic styling based on user preferences
+    bg_color = "#000000" if high_contrast else "#ffffff"
+    text_color = "#ffffff" if high_contrast else "#333"
+    heading_color = "#ffffff" if high_contrast else "#1f2937"
+    code_bg = "#333333" if high_contrast else "#f8f9fa"
+    code_border = "#555555" if high_contrast else "#e9ecef"
+    table_bg = "#1a1a1a" if high_contrast else "#f2f2f2"
+    table_border = "#555555" if high_contrast else "#ddd"
+    
     full_html = f'''
-<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: {reading_width}px; margin: 0 auto; background-color: {bg_color};">
     <style>
         .markdown-content {{
-            line-height: 1.6;
-            font-size: 16px;
-            color: #333;
+            line-height: {line_height};
+            font-size: {font_size}px;
+            color: {text_color};
+            max-width: {reading_width}px;
+            margin: 0 auto;
+            background-color: {bg_color};
         }}
-        .markdown-content h1, .markdown-content h2, .markdown-content h3 {{
+        .markdown-content h1, .markdown-content h2, .markdown-content h3, 
+        .markdown-content h4, .markdown-content h5, .markdown-content h6 {{
             margin-top: 1.5em;
             margin-bottom: 0.5em;
-            color: #1f2937;
+            color: {heading_color};
+            font-size: {font_size * 1.2}px;
+            line-height: {line_height};
+        }}
+        .markdown-content p, .markdown-content li {{
+            font-size: {font_size}px;
+            line-height: {line_height};
         }}
         .markdown-content pre {{
-            background-color: #f8f9fa;
-            border: 1px solid #e9ecef;
+            background-color: {code_bg};
+            border: 1px solid {code_border};
             border-radius: 4px;
             padding: 1rem;
             overflow-x: auto;
             margin: 1em 0;
         }}
         .markdown-content code {{
-            background-color: #f8f9fa;
+            background-color: {code_bg};
+            color: {text_color};
             padding: 0.2em 0.4em;
             border-radius: 3px;
-            font-size: 0.9em;
+            font-size: {font_size * 0.9}px;
             font-family: 'Monaco', 'Consolas', 'Courier New', monospace;
         }}
         .markdown-content pre code {{
@@ -723,12 +765,13 @@ def render_markdown_component(html_content, selected_file_path):
             margin: 1em 0;
         }}
         .markdown-content th, .markdown-content td {{
-            border: 1px solid #ddd;
+            border: 1px solid {table_border};
             padding: 8px 12px;
             text-align: left;
+            color: {text_color};
         }}
         .markdown-content th {{
-            background-color: #f2f2f2;
+            background-color: {table_bg};
             font-weight: bold;
         }}
         .highlight {{
@@ -1056,23 +1099,89 @@ def main():
                 del st.query_params['navigate_to']
             st.rerun()
     
-    # Custom CSS to reduce top padding
-    st.markdown("""
+    # Dynamic CSS based on user settings
+    high_contrast_css = ""
+    if st.session_state.high_contrast_mode:
+        high_contrast_css = """
+        /* High contrast mode styles */
+        .stApp {
+            background-color: #000000 !important;
+            color: #ffffff !important;
+        }
+        .stSidebar {
+            background-color: #1a1a1a !important;
+        }
+        .stMarkdown {
+            color: #ffffff !important;
+        }
+        """
+    
+    reduce_motion_css = ""
+    if st.session_state.reduce_motion:
+        reduce_motion_css = """
+        /* Reduce motion styles */
+        * {
+            animation-duration: 0.001ms !important;
+            transition-duration: 0.001ms !important;
+            animation-iteration-count: 1 !important;
+        }
+        """
+    
+    screen_reader_css = ""
+    if st.session_state.screen_reader_optimizations:
+        screen_reader_css = """
+        /* Screen reader optimizations */
+        .stApp {
+            font-family: 'Arial', 'Helvetica', sans-serif !important;
+        }
+        /* Add focus indicators */
+        button:focus, input:focus, textarea:focus, select:focus {
+            outline: 3px solid #005fcc !important;
+            outline-offset: 2px !important;
+        }
+        """
+    
+    st.markdown(f"""
     <style>
     /* Reduce top and bottom padding of main content area */
-    .stMainBlockContainer.block-container.st-emotion-cache-zy6yx3.e4man114 {
+    .stMainBlockContainer.block-container.st-emotion-cache-zy6yx3.e4man114 {{
         padding-top: 1.0rem !important;
         padding-bottom: 0.75rem !important;
-    }
+    }}
     
     /* Alternative selectors in case the class names change */
-    .stMainBlockContainer, .block-container {
+    .stMainBlockContainer, .block-container {{
         padding-top: 1.0rem !important;
         padding-bottom: 0.75rem !important;
-    }
+    }}
     
     /* Ensure app body can extend closer to viewport bottom */
-    main .block-container { min-height: calc(100vh - 200px); }
+    main .block-container {{ min-height: calc(100vh - 200px); }}
+    
+    /* Dynamic font size and reading settings */
+    .main-content {{
+        font-size: {st.session_state.font_size}px !important;
+        line-height: {st.session_state.line_height} !important;
+        max-width: {st.session_state.reading_width}px !important;
+        margin: 0 auto !important;
+    }}
+    
+    /* Apply settings to markdown content */
+    .stMarkdown p, .stMarkdown h1, .stMarkdown h2, .stMarkdown h3, .stMarkdown h4, .stMarkdown h5, .stMarkdown h6,
+    .stMarkdown li, .stMarkdown blockquote {{
+        font-size: {st.session_state.font_size}px !important;
+        line-height: {st.session_state.line_height} !important;
+    }}
+    
+    /* Apply max width to main content areas */
+    .main-content-area {{
+        max-width: {st.session_state.reading_width}px !important;
+        margin: 0 auto !important;
+    }}
+    
+    {high_contrast_css}
+    {reduce_motion_css}
+    {screen_reader_css}
     </style>
     """, unsafe_allow_html=True)
     
@@ -1817,6 +1926,97 @@ def main():
                             st.success(message)
                         else:
                             st.error(message)
+        
+        # Settings Panel
+        st.divider()
+        with st.expander("⚙️ Settings", expanded=False):
+            st.subheader("Font Size")
+            font_size = st.slider(
+                "Font Size",
+                min_value=10,
+                max_value=24,
+                value=st.session_state.font_size,
+                step=1,
+                format="%dpx",
+                help="Adjust the font size for better readability",
+                label_visibility="collapsed"
+            )
+            if font_size != st.session_state.font_size:
+                st.session_state.font_size = font_size
+                st.rerun()
+            
+            st.subheader("Line Height")
+            line_height = st.slider(
+                "Line Height",
+                min_value=1.0,
+                max_value=3.0,
+                value=st.session_state.line_height,
+                step=0.1,
+                format="%.1f",
+                help="Adjust line spacing for comfortable reading",
+                label_visibility="collapsed"
+            )
+            if line_height != st.session_state.line_height:
+                st.session_state.line_height = line_height
+                st.rerun()
+            
+            st.subheader("Reading Width")
+            reading_width = st.slider(
+                "Reading Width",
+                min_value=600,
+                max_value=1200,
+                value=st.session_state.reading_width,
+                step=50,
+                format="%dpx",
+                help="Adjust the maximum width of text content",
+                label_visibility="collapsed"
+            )
+            if reading_width != st.session_state.reading_width:
+                st.session_state.reading_width = reading_width
+                st.rerun()
+            
+            st.subheader("Accessibility")
+            
+            high_contrast = st.checkbox(
+                "High Contrast Mode",
+                value=st.session_state.high_contrast_mode,
+                help="Enable high contrast colors for better visibility"
+            )
+            if high_contrast != st.session_state.high_contrast_mode:
+                st.session_state.high_contrast_mode = high_contrast
+                st.rerun()
+            
+            reduce_motion = st.checkbox(
+                "Reduce Motion",
+                value=st.session_state.reduce_motion,
+                help="Reduce animations and transitions"
+            )
+            if reduce_motion != st.session_state.reduce_motion:
+                st.session_state.reduce_motion = reduce_motion
+                st.rerun()
+            
+            screen_reader = st.checkbox(
+                "Screen Reader Optimizations",
+                value=st.session_state.screen_reader_optimizations,
+                help="Enable optimizations for screen readers"
+            )
+            if screen_reader != st.session_state.screen_reader_optimizations:
+                st.session_state.screen_reader_optimizations = screen_reader
+                st.rerun()
+            
+            st.subheader("🎨 Syntax Highlighting Colors")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("🎨 Customize Colors", use_container_width=True):
+                    st.info("Color customization coming soon!")
+                if st.button("🔄 Reset to Default", use_container_width=True):
+                    st.info("Color reset coming soon!")
+            with col2:
+                if st.button("📦 Export Scheme", use_container_width=True):
+                    st.info("Export coming soon!")
+                if st.button("📁 Import Scheme", use_container_width=True):
+                    st.info("Import coming soon!")
     
     # Main content area
     if 'selected_file' in st.session_state and os.path.exists(st.session_state.selected_file):
