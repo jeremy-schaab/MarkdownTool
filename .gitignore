@@ -122,3 +122,8 @@ safety-report.txt
 
 # MacOS
 .DS_Store
+
+# Claude Code and AI tools
+.claude/agents/
+.claude/commands/
+.fyiai/
