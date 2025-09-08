@@ -1200,6 +1200,113 @@ def main():
     with header_col3:
         st.write("")  # Empty column for spacing
     
+    # Settings Modal
+    if st.session_state.show_settings_modal:
+        with st.container():
+            st.markdown("---")
+            st.subheader("⚙️ Settings")
+            
+            # Create columns for settings layout
+            settings_col1, settings_col2, settings_col3 = st.columns([1, 1, 1])
+            
+            with settings_col1:
+                st.markdown("**Typography**")
+                font_size = st.slider(
+                    "Font Size",
+                    min_value=10,
+                    max_value=24,
+                    value=st.session_state.font_size,
+                    step=1,
+                    format="%dpx",
+                    help="Adjust the font size for better readability",
+                    key="modal_font_size"
+                )
+                if font_size != st.session_state.font_size:
+                    st.session_state.font_size = font_size
+                    st.rerun()
+                
+                line_height = st.slider(
+                    "Line Height",
+                    min_value=1.0,
+                    max_value=3.0,
+                    value=st.session_state.line_height,
+                    step=0.1,
+                    format="%.1f",
+                    help="Adjust line spacing for comfortable reading",
+                    key="modal_line_height"
+                )
+                if line_height != st.session_state.line_height:
+                    st.session_state.line_height = line_height
+                    st.rerun()
+                
+                reading_width = st.slider(
+                    "Reading Width",
+                    min_value=600,
+                    max_value=1200,
+                    value=st.session_state.reading_width,
+                    step=50,
+                    format="%dpx",
+                    help="Adjust the maximum width of text content",
+                    key="modal_reading_width"
+                )
+                if reading_width != st.session_state.reading_width:
+                    st.session_state.reading_width = reading_width
+                    st.rerun()
+            
+            with settings_col2:
+                st.markdown("**Accessibility**")
+                
+                high_contrast = st.checkbox(
+                    "High Contrast Mode",
+                    value=st.session_state.high_contrast_mode,
+                    help="Enable high contrast colors for better visibility",
+                    key="modal_high_contrast"
+                )
+                if high_contrast != st.session_state.high_contrast_mode:
+                    st.session_state.high_contrast_mode = high_contrast
+                    st.rerun()
+                
+                reduce_motion = st.checkbox(
+                    "Reduce Motion",
+                    value=st.session_state.reduce_motion,
+                    help="Reduce animations and transitions",
+                    key="modal_reduce_motion"
+                )
+                if reduce_motion != st.session_state.reduce_motion:
+                    st.session_state.reduce_motion = reduce_motion
+                    st.rerun()
+                
+                screen_reader = st.checkbox(
+                    "Screen Reader Optimizations",
+                    value=st.session_state.screen_reader_optimizations,
+                    help="Enable optimizations for screen readers",
+                    key="modal_screen_reader"
+                )
+                if screen_reader != st.session_state.screen_reader_optimizations:
+                    st.session_state.screen_reader_optimizations = screen_reader
+                    st.rerun()
+            
+            with settings_col3:
+                st.markdown("**🎨 Syntax Highlighting**")
+                
+                if st.button("🎨 Customize Colors", use_container_width=True, key="modal_customize"):
+                    st.info("Color customization coming soon!")
+                if st.button("🔄 Reset to Default", use_container_width=True, key="modal_reset"):
+                    st.info("Color reset coming soon!")
+                if st.button("📦 Export Scheme", use_container_width=True, key="modal_export"):
+                    st.info("Export coming soon!")
+                if st.button("📁 Import Scheme", use_container_width=True, key="modal_import"):
+                    st.info("Import coming soon!")
+            
+            # Close settings button
+            col_close1, col_close2, col_close3 = st.columns([2, 1, 2])
+            with col_close2:
+                if st.button("❌ Close Settings", type="primary", use_container_width=True):
+                    st.session_state.show_settings_modal = False
+                    st.rerun()
+            
+            st.markdown("---")
+    
     # Sidebar with file selection
     with st.sidebar:
         # File uploader for markdown files (hidden for now)
