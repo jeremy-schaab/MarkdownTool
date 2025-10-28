@@ -577,14 +577,28 @@ def initialize_session_state():
     if 'has_unsaved_changes' not in st.session_state:
         st.session_state.has_unsaved_changes = False
     if 'editor_layout' not in st.session_state:
-        st.session_state.editor_layout = "inline"  # inline, side-by-side, tabbed
+        st.session_state.editor_layout = "side-by-side"  # inline, side-by-side, tabbed (default to side-by-side)
     if 'original_content' not in st.session_state:
         st.session_state.original_content = ""
     if 'confirm_save' not in st.session_state:
         st.session_state.confirm_save = False
     if 'confirm_delete' not in st.session_state:
         st.session_state.confirm_delete = False
-    
+
+    # Debouncing for preview updates
+    if 'last_edit_time' not in st.session_state:
+        st.session_state.last_edit_time = 0
+    if 'preview_content_cache' not in st.session_state:
+        st.session_state.preview_content_cache = ""
+
+    # File search/filter
+    if 'file_search_query' not in st.session_state:
+        st.session_state.file_search_query = ""
+
+    # Keyboard shortcuts state
+    if 'shortcut_triggered' not in st.session_state:
+        st.session_state.shortcut_triggered = None
+
     # AI summarization session state
     if 'ai_summary' not in st.session_state:
         st.session_state.ai_summary = ""
@@ -677,6 +691,25 @@ def check_unsaved_changes():
     if hasattr(st.session_state, 'editor_content') and hasattr(st.session_state, 'original_content'):
         return st.session_state.editor_content != st.session_state.original_content
     return False
+
+def should_update_preview(force=False):
+    """Debounce preview updates - only update if 0.5 seconds have passed since last edit"""
+    if force:
+        return True
+
+    current_time = time.time()
+    time_since_last_edit = current_time - st.session_state.last_edit_time
+
+    # Only update if 0.5 seconds have passed
+    return time_since_last_edit > 0.5
+
+def get_preview_content():
+    """Get preview content with debouncing"""
+    if should_update_preview():
+        # Update cache with fresh render
+        st.session_state.preview_content_cache = render_markdown(st.session_state.editor_content)
+
+    return st.session_state.preview_content_cache
 
 def render_markdown_component(html_content, selected_file_path):
     """Render the markdown HTML component"""
@@ -1004,31 +1037,108 @@ def build_printable_html_document(html_content: str, title: str = "Document") ->
  </html>"""
     return full
 
+def insert_markdown_snippet(snippet_type):
+    """Insert markdown snippet at the end of editor content"""
+    snippets = {
+        "bold": "**bold text**",
+        "italic": "*italic text*",
+        "h1": "\n# Header 1\n",
+        "h2": "\n## Header 2\n",
+        "h3": "\n### Header 3\n",
+        "link": "[link text](url)",
+        "image": "![alt text](image-url)",
+        "code": "`inline code`",
+        "code_block": "\n```python\n# code block\n```\n",
+        "quote": "\n> Quote\n",
+        "list": "\n- List item\n",
+        "numbered_list": "\n1. First item\n",
+        "table": "\n| Header 1 | Header 2 |\n|----------|----------|\n| Cell 1   | Cell 2   |\n",
+        "hr": "\n---\n",
+        "checkbox": "\n- [ ] Task item\n"
+    }
+
+    if snippet_type in snippets:
+        current = st.session_state.editor_content
+        st.session_state.editor_content = current + snippets[snippet_type]
+        st.session_state.has_unsaved_changes = check_unsaved_changes()
+
 def render_editor_toolbar():
-    """Render the editor toolbar with formatting buttons"""
-    col1, col2, col3, col4, col5, col6, col7 = st.columns([1, 1, 1, 1, 1, 1, 2])
-    
+    """Render the enhanced editor toolbar with comprehensive formatting buttons"""
+    st.markdown("**Formatting Toolbar:**")
+
+    # Row 1: Text formatting and headers
+    col1, col2, col3, col4, col5, col6 = st.columns(6)
     with col1:
-        if st.button("**B**", help="Bold text", key="bold_btn"):
-            st.session_state.editor_insert = "**bold text**"
+        if st.button("**B**", help="Bold text (Ctrl+B)", key="bold_btn", use_container_width=True):
+            insert_markdown_snippet("bold")
+            st.rerun()
     with col2:
-        if st.button("*I*", help="Italic text", key="italic_btn"):
-            st.session_state.editor_insert = "*italic text*"
+        if st.button("*I*", help="Italic text (Ctrl+I)", key="italic_btn", use_container_width=True):
+            insert_markdown_snippet("italic")
+            st.rerun()
     with col3:
-        if st.button("H1", help="Header 1", key="h1_btn"):
-            st.session_state.editor_insert = "# Header 1"
+        if st.button("H1", help="Header 1", key="h1_btn", use_container_width=True):
+            insert_markdown_snippet("h1")
+            st.rerun()
     with col4:
-        if st.button("H2", help="Header 2", key="h2_btn"):
-            st.session_state.editor_insert = "## Header 2"
+        if st.button("H2", help="Header 2", key="h2_btn", use_container_width=True):
+            insert_markdown_snippet("h2")
+            st.rerun()
     with col5:
-        if st.button("[](", help="Link", key="link_btn"):
-            st.session_state.editor_insert = "[link text](url)"
+        if st.button("H3", help="Header 3", key="h3_btn", use_container_width=True):
+            insert_markdown_snippet("h3")
+            st.rerun()
     with col6:
-        if st.button("`", help="Code", key="code_btn"):
-            st.session_state.editor_insert = "`code`"
-    with col7:
-        if st.button("📋 Copy", help="Copy content to clipboard", key="copy_btn"):
-            st.code(st.session_state.editor_content)
+        if st.button("🔗", help="Insert link", key="link_btn", use_container_width=True):
+            insert_markdown_snippet("link")
+            st.rerun()
+
+    # Row 2: Code, lists, and special elements
+    col1, col2, col3, col4, col5, col6 = st.columns(6)
+    with col1:
+        if st.button("`<>`", help="Inline code", key="code_btn", use_container_width=True):
+            insert_markdown_snippet("code")
+            st.rerun()
+    with col2:
+        if st.button("```", help="Code block", key="codeblock_btn", use_container_width=True):
+            insert_markdown_snippet("code_block")
+            st.rerun()
+    with col3:
+        if st.button("• UL", help="Bullet list", key="list_btn", use_container_width=True):
+            insert_markdown_snippet("list")
+            st.rerun()
+    with col4:
+        if st.button("1. OL", help="Numbered list", key="numlist_btn", use_container_width=True):
+            insert_markdown_snippet("numbered_list")
+            st.rerun()
+    with col5:
+        if st.button("☐", help="Checkbox/Task", key="checkbox_btn", use_container_width=True):
+            insert_markdown_snippet("checkbox")
+            st.rerun()
+    with col6:
+        if st.button('"', help="Blockquote", key="quote_btn", use_container_width=True):
+            insert_markdown_snippet("quote")
+            st.rerun()
+
+    # Row 3: Advanced elements
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        if st.button("🖼️", help="Insert image", key="image_btn", use_container_width=True):
+            insert_markdown_snippet("image")
+            st.rerun()
+    with col2:
+        if st.button("📊", help="Insert table", key="table_btn", use_container_width=True):
+            insert_markdown_snippet("table")
+            st.rerun()
+    with col3:
+        if st.button("—", help="Horizontal rule", key="hr_btn", use_container_width=True):
+            insert_markdown_snippet("hr")
+            st.rerun()
+    with col4:
+        if st.button("📋", help="Copy all content", key="copy_btn", use_container_width=True):
+            st.info("💡 Use Ctrl+A to select all, then Ctrl+C to copy")
+
+    st.markdown("---")
 
 def main():
     st.set_page_config(
@@ -1850,27 +1960,31 @@ def main():
                         # Show only editor
                         st.subheader("✏️ Editing Mode")
                         render_editor_toolbar()
-                        
-                        # Editor component
+
+                        # Editor component with reduced rerun frequency
                         edited_content = st_ace(
                             value=st.session_state.editor_content,
                             language='markdown',
                             theme='github',
                             key='markdown_editor',
-                            height=600,
-                            auto_update=True,
+                            height=700,
+                            auto_update=False,  # Disable auto-update to reduce reruns
                             font_size=14,
                             tab_size=2,
                             wrap=True,
                             annotations=None,
                             markers=None,
                         )
-                        
-                        # Update editor content and check for changes
+
+                        # Update editor content and check for changes with debouncing
                         if edited_content != st.session_state.editor_content:
                             st.session_state.editor_content = edited_content
+                            st.session_state.last_edit_time = time.time()
                             st.session_state.has_unsaved_changes = check_unsaved_changes()
-                            st.rerun()
+
+                        # Show unsaved indicator
+                        if st.session_state.has_unsaved_changes:
+                            st.warning("⚠️ You have unsaved changes")
                     
                     elif st.session_state.editor_layout == "side-by-side":
                         # Show editor and preview side by side
